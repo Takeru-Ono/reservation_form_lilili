@@ -192,6 +192,25 @@
       to { transform: rotate(360deg); }
     }
 
+    /* LINEボタン用 */
+    a.button-link {
+      display: inline-block;
+      padding: 10px 18px;
+      border-radius: 6px;
+      border: 1px solid #06c755;
+      background: #06c755;
+      color: #fff;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    a.button-link:hover {
+      opacity: 0.9;
+    }
+    .hint {
+      color: #666;
+      font-size: 0.85rem;
+    }
+
     /* 必要であればここに今後のレスポンシブ調整を追加 */
   </style>
 </head>
@@ -214,6 +233,10 @@
 
   <script>
     const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+    // 🔗 LINE連携用ベースURL（ここをあなたのLINE連携用WebアプリURLに差し替える）
+    // 例: const lineLinkBaseUrl = 'https://script.google.com/macros/s/xxxx/exec?page=line';
+    const lineLinkBaseUrl = 'https://example.com/line-link';
 
     // 基本ブロック（2時間単位）
     const BASE_BLOCKS = [
@@ -698,17 +721,34 @@
       }
 
       google.script.run
-        .withSuccessHandler(() => {
+        .withSuccessHandler((res) => {
           const formArea = document.getElementById("formArea");
-          if (formArea) {
+          const slotsDiv = document.getElementById("slots");
+          if (slotsDiv) slotsDiv.innerHTML = "";
+
+          const token = res && res.token;
+          if (!formArea) return;
+
+          if (!token) {
+            // トークンが取れなかった場合は従来どおりの完了表示＋戻る
             formArea.innerHTML = `
               <h3>予約の送信をしました</h3>
               <p>ご入力いただいた内容をもとに予約を登録しました。</p>
+              <p class="hint">※LINE連携用の情報取得に失敗しました。お手数ですが運営までお問い合わせください。</p>
+              <button onclick="resetReservation()">元の画面に戻る</button>
+            `;
+          } else {
+            const url = lineLinkBaseUrl + '?token=' + encodeURIComponent(token);
+            formArea.innerHTML = `
+              <h3>予約の送信をしました</h3>
+              <p>ご入力いただいた内容をもとに予約を登録しました。</p>
+              <p>LINEで鍵番号とご利用案内を受け取るには、下のボタンをタップしてください。</p>
+              <p><a class="button-link" href="${url}" target="_blank" rel="noopener noreferrer">LINEで鍵を受け取る</a></p>
+              <p class="hint">※スマートフォンで開いている場合、LINEアプリが起動することがあります。</p>
               <button onclick="resetReservation()">元の画面に戻る</button>
             `;
           }
-          const slotsDiv = document.getElementById("slots");
-          if (slotsDiv) slotsDiv.innerHTML = "";
+
           currentSelectedDate = null;
           selectedSlots = [];
         })

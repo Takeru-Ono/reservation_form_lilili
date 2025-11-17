@@ -8,6 +8,8 @@ const CONFIG = {
   TIMEZONE: "Asia/Tokyo",
   // 日本の祝日カレンダー（必要に応じて変更可）
   HOLIDAY_CALENDAR_ID: "ja.japanese#holiday@group.v.calendar.google.com",
+  // 🔑 一旦固定の鍵番号（運用に合わせて変更）
+  KEY_CODE: "1234",
 };
 
 // 時間帯パターン（フロントの index.html と同じ構成）
@@ -154,6 +156,10 @@ function reserve(data) {
     end: new Date(s.end),
   }));
 
+  // 🔑 トークン & 鍵番号生成
+  const token = generateToken_();
+  const keyCode = CONFIG.KEY_CODE;
+
   // 二重予約チェック（ここは件数が少ないので getEvents でOK）
   slots.forEach((s) => {
     if (cal.getEvents(s.start, s.end).length > 0) {
@@ -165,7 +171,9 @@ function reserve(data) {
   slots.forEach((s) => {
     cal.createEvent(`予約: ${data.name}`, s.start, s.end, {
       description: `名前: ${data.name}
-メール: ${data.email}`,
+メール: ${data.email}
+鍵番号: ${keyCode}
+トークン: ${token}`,
       guests: data.email, // カンマ区切り文字列で指定
       sendInvites: true,
     });
@@ -177,20 +185,32 @@ function reserve(data) {
     const sheet = ss.getSheetByName("log") || ss.insertSheet("log");
     slots.forEach((s) => {
       sheet.appendRow([
-        new Date(),
+        new Date(), // ログ記録時刻
         s.start,
         s.end,
         data.name,
         data.email,
         data.agree,
+        token, // 予約トークン
+        keyCode, // 鍵番号
+        "", // line_user_id（今後LINEと紐づける用）
       ]);
     });
   }
 
-  return { ok: true };
+  // フロントにトークンを返す
+  return { ok: true, token: token };
 }
 
 // ===== Utilities =====
+
+// トークン生成（例: R-20251117-3F9KZ2）
+function generateToken_() {
+  const now = new Date();
+  const ymd = Utilities.formatDate(now, CONFIG.TIMEZONE, "yyyyMMdd");
+  const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return "R-" + ymd + "-" + rand;
+}
 
 // 「営業日」判定（このシステムでは「土日 or 祝日」が営業日）
 // isHoliday は事前に isHolidayCached_ で判定して渡す
