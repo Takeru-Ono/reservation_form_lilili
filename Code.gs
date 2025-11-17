@@ -1,5 +1,11 @@
 // Code.gs - Reservation System Backend (Apps Script)
 
+// TODO: スマホ向けにボタン/スロットのタップ領域を広げる
+// TODO: 2つ選択時のアラートを削除（ロジック側で制御）
+// TODO: セキュリティ対策
+// TODO: 写真を受け取った時のフロー（AIで関係ない写真の判別までするべきかどうか→しなくていい気がする）
+// TODO: アクセスが集中すると見えないことが多い
+
 // CONFIG: 必要に応じて書き換え
 const CONFIG = {
   CALENDAR_ID:
