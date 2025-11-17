@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>学びのかまくら レンタルスペース予約フォーム</title>
+  <style>
+    body {
+      font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+      background: #fffaf5;
+      padding: 24px 24px 40px;
+      max-width: 760px;
+      margin: 0 auto;
+      color: #333;
+    }
+    h1 {
+      font-size: 2.1rem;
+      margin-bottom: 4px;
+      text-align: center;
+      letter-spacing: 0.08em;
+    }
+    h2 {
+      font-size: 1.3rem;
+      margin-top: 0;
+      margin-bottom: 12px;
+      color: #c24d16;
+      text-align: center;
+      letter-spacing: 0.06em;
+    }
+    .lead-text {
+      text-align: center;
+      font-size: 0.95rem;
+      margin-bottom: 16px;
+    }
+    .month-nav { display: flex; align-items: center; gap: 8px; margin: 20px 0 12px; justify-content: center; }
+    .month-label { font-weight: bold; margin: 0 8px; }
+    #dates {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .date-item {
+      padding: 6px 8px;
+      border: 1px solid #e2d8cf;
+      cursor: pointer;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      aspect-ratio: 1 / 1;
+      background: #fff;
+      box-sizing: border-box;
+    }
+    .date-item:hover { background: #f7f0ea; }
+    .date-item.disabled {
+      opacity: 0.4;
+      cursor: default;
+      background: #f2ece7;
+      border-style: dashed;
+    }
+    .date-item.disabled:hover { background: #f5f5f5; }
+    .date-label {
+      font-weight: 500;
+      text-align: center;
+      font-size: 0.9rem;
+      margin-bottom: 2px;
+    }
+    .date-bottom {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .date-divider {
+      border-top: 1px solid #eee;
+      margin-top: 2px;
+    }
+    .date-status {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+    }
+    .weekday-sun { color: #e53935; }
+    .weekday-sat { color: #1e88e5; }
+    .weekday-holiday { color: #e53935; }
+
+    /* 空き状況マーク */
+    .status-circle {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: inline-block;
+      background: #3cb371; /* デフォルトは緑 ◎ */
+    }
+    .status-triangle {
+      width: 0;
+      height: 0;
+      border-left: 9px solid transparent;
+      border-right: 9px solid transparent;
+      border-bottom: 18px solid #ff9800; /* △ オレンジ */
+      display: inline-block;
+    }
+    .status-cross {
+      position: relative;
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+    }
+    .status-cross::before,
+    .status-cross::after {
+      content: "";
+      position: absolute;
+      left: 8px;
+      top: 0;
+      width: 2px;
+      height: 18px;
+      background: #e53935; /* × 赤 */
+    }
+    .status-cross::before {
+      transform: rotate(45deg);
+    }
+    .status-cross::after {
+      transform: rotate(-45deg);
+    }
+    .date-status-text { display: none; font-size: 0.75rem; }
+    .slots { margin-top: 24px; }
+    .slot-group-title { margin-top: 16px; margin-bottom: 6px; font-weight: bold; color: #c24d16; }
+    .slot-item {
+      padding: 8px 10px;
+      margin: 4px 0;
+      border: 1px solid #d0c3b8;
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+      background: #fff;
+    }
+    .slot-item.single { border-color: #f36c21; background: #fff4ea; }
+    .slot-item.double { border-color: #c24d16; background: #ffe4d1; }
+    .slot-item:hover { background: #f7f0ea; }
+    .slot-item.selected {
+      box-shadow: 0 0 0 2px #f36c21 inset;
+    }
+    .slot-item.disabled { opacity: 0.4; cursor: default; background: #f5f5f5; border-style: dashed; }
+    .slot-item.disabled:hover { background: #f5f5f5; }
+    .slot-label { font-weight: 500; }
+    .slot-meta { font-size: 0.85rem; color: #555; }
+    .slot-price { font-weight: bold; margin-left: 8px; }
+    #formArea { margin-top: 24px; padding: 14px; border: 1px solid #e2d8cf; border-radius: 6px; background: #fff; }
+    .error-text {
+      color: #e53935;
+      font-size: 0.8rem;
+      margin-top: 4px;
+    }
+    button {
+      padding: 8px 18px;
+      border-radius: 4px;
+      border: none;
+      background: #f36c21;
+      color: #fff;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #d95c19;
+    }
+
+    /* ローディング表示 */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 0;
+      color: #888;
+      font-size: 0.9rem;
+    }
+    .loading-spinner {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid #ddd;
+      border-top-color: #f36c21;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* 必要であればここに今後のレスポンシブ調整を追加 */
+  </style>
+</head>
+<body>
+  <h1>学びのかまくら</h1>
+  <h2>レンタルスペース予約フォーム</h2>
+  <p class="lead-text">ご希望の土日祝と時間帯をお選びください。</p>
+
+  <div class="month-nav">
+    <button id="prevMonthBtn">&lt; 前の月</button>
+    <span id="currentMonthLabel" class="month-label"></span>
+    <button id="nextMonthBtn">次の月 &gt;</button>
+  </div>
+
+  <div id="dates">読み込み中...</div>
+
+  <div id="slots" class="slots"></div>
+
+  <div id="formArea"></div>
+
+  <script>
+    const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+    // 基本ブロック（2時間単位）
+    const BASE_BLOCKS = [
+      { id: "A", startTime: "09:00", endTime: "11:00" },
+      { id: "B", startTime: "11:00", endTime: "13:00" },
+      { id: "C", startTime: "13:30", endTime: "15:30" },
+      { id: "D", startTime: "15:30", endTime: "17:30" }
+    ];
+
+    // 1コマ（2時間）3000円
+    const SINGLE_OFFERS = [
+      { id: "S_A", label: "9:00 - 11:00", blocks: ["A"], price: 3000 },
+      { id: "S_B", label: "11:00 - 13:00", blocks: ["B"], price: 3000 },
+      { id: "S_C", label: "13:30 - 15:30", blocks: ["C"], price: 3000 },
+      { id: "S_D", label: "15:30 - 17:30", blocks: ["D"], price: 3000 }
+    ];
+
+    // 2コマ（4時間）5000円
+    const DOUBLE_OFFERS = [
+      { id: "D_AB", label: "9:00 - 13:00", blocks: ["A", "B"], price: 5000 },
+      { id: "D_CD", label: "13:30 - 17:30", blocks: ["C", "D"], price: 5000 }
+    ];
+
+    // サーバーから渡される start/end とオファー定義をひも付けるためのマップ
+    const OFFER_BY_RANGE = {};
+    [...SINGLE_OFFERS, ...DOUBLE_OFFERS].forEach(o => {
+      const blocks = o.blocks.map(id => BASE_BLOCKS.find(b => b.id === id));
+      const first = blocks[0];
+      const last = blocks[blocks.length - 1];
+      const key = `${first.startTime}-${last.endTime}`; // "HH:MM-HH:MM"
+      OFFER_BY_RANGE[key] = o;
+    });
+
+    // カレント表示月
+    let currentMonth = new Date();
+    currentMonth.setDate(1);
+
+    function formatMonthLabel(date) {
+      const y = date.getFullYear();
+      const m = date.getMonth() + 1;
+      return `${y}年${m}月`;
+    }
+
+    function toDateString(year, monthIndex, day) {
+      const m = String(monthIndex + 1).padStart(2, "0");
+      const d = String(day).padStart(2, "0");
+      return `${year}-${m}-${d}`;
+    }
+
+    function getWeekdayLabel(dateStr) {
+      const d = new Date(dateStr);
+      return WEEKDAYS[d.getDay()];
+    }
+
+    // 選択状態
+    let currentSelectedDate = null;
+    let selectedSlots = [];
+
+    function clearFormErrors() {
+      ["formGeneralError", "nameError", "emailError", "agreeError"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = "";
+      });
+    }
+
+    function showLoading(targetId) {
+      const el = document.getElementById(targetId);
+      if (!el) return;
+      el.innerHTML = `
+        <div class="loading">
+          <div class="loading-spinner"></div>
+          <span>読み込み中...</span>
+        </div>
+      `;
+    }
+
+    // ====================
+    // 月ごとの日付リスト表示（サーバーの getAvailability から取得）
+    // ====================
+    function loadCurrentMonth() {
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth() + 1; // 1-12
+      showLoading("dates");
+      google.script.run
+        .withSuccessHandler(renderCurrentMonth)
+        .getAvailability(year, month);
+    }
+
+    function renderCurrentMonth(list) {
+      const label = document.getElementById("currentMonthLabel");
+      const datesDiv = document.getElementById("dates");
+
+      label.textContent = formatMonthLabel(currentMonth);
+      datesDiv.innerHTML = "";
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      list.forEach(item => {
+        // item: { date: "YYYY-MM-DD", status: "◎/△/×", isHoliday?: boolean }
+        const dateStr = item.date;
+        const dateObj = new Date(dateStr);
+        const weekdayIndex = dateObj.getDay();
+
+        const weekdayLabel = WEEKDAYS[weekdayIndex];
+        const status = item.status || "◎";
+        const isPast = dateObj < today;
+
+        const e = document.createElement("div");
+        e.className = "date-item";
+
+        if (isPast || status === "×") {
+          e.classList.add("disabled");
+        } else {
+          e.onclick = () => loadSlots(dateStr);
+        }
+
+        const label = document.createElement("div");
+        label.className = "date-label";
+        let weekdayClass = "";
+        if (weekdayIndex === 0) weekdayClass = "weekday-sun";
+        else if (weekdayIndex === 6) weekdayClass = "weekday-sat";
+        if (item.isHoliday && weekdayIndex !== 0) weekdayClass = "weekday-holiday";
+        const monthIndex = dateObj.getMonth();
+        const day = dateObj.getDate();
+        label.innerHTML = `${monthIndex + 1}/${day}（<span class="${weekdayClass}">${weekdayLabel}</span>）`;
+
+        const bottom = document.createElement("div");
+        bottom.className = "date-bottom";
+
+        const divider = document.createElement("div");
+        divider.className = "date-divider";
+
+        const statusWrap = document.createElement("div");
+        statusWrap.className = "date-status";
+
+        const mark = document.createElement("span");
+        if (status === "◎") {
+          mark.className = "status-circle";
+        } else if (status === "△") {
+          mark.className = "status-triangle";
+        } else {
+          mark.className = "status-cross";
+        }
+        mark.title = status; // 状態はツールチップで確認できるように
+
+        statusWrap.appendChild(mark);
+
+        bottom.appendChild(divider);
+        bottom.appendChild(statusWrap);
+
+        e.appendChild(label);
+        e.appendChild(bottom);
+        datesDiv.appendChild(e);
+      });
+    }
+
+    // 時間枠読み込み
+    function loadSlots(date) {
+      showLoading("slots");
+      document.getElementById("formArea").innerHTML = "";
+
+      currentSelectedDate = date;
+      selectedSlots = [];
+
+      const area = document.getElementById("slots");
+      const weekdayLabel = getWeekdayLabel(date);
+
+      google.script.run
+        .withSuccessHandler(slots => renderSlotsForDate(date, weekdayLabel, slots))
+        .getSlots(date);
+    }
+
+    function toTimeKey(isoString) {
+      const d = new Date(isoString);
+      const h = String(d.getHours()).padStart(2, "0");
+      const m = String(d.getMinutes()).padStart(2, "0");
+      return `${h}:${m}`;
+    }
+
+    function buildOffersFromSlots(slots) {
+      // slots: [{start: ISO, end: ISO}, ...] を SINGLE/DOUBLE オファーに変換
+      const seen = new Set();
+      const single = [];
+      const double = [];
+
+      slots.forEach(s => {
+        const key = `${toTimeKey(s.start)}-${toTimeKey(s.end)}`; // "HH:MM-HH:MM"
+        const baseOffer = OFFER_BY_RANGE[key];
+        if (!baseOffer) return;
+        if (seen.has(baseOffer.id)) return;
+        seen.add(baseOffer.id);
+        const offer = { ...baseOffer, available: true };
+        if (offer.blocks.length === 1) single.push(offer);
+        else double.push(offer);
+      });
+
+      return { single, double };
+    }
+
+    function renderSlotsForDate(date, weekdayLabel, slots) {
+      const area = document.getElementById("slots");
+
+      const { single, double } = buildOffersFromSlots(slots || []);
+      const availableCount = [...single, ...double].filter(o => o.available).length;
+
+      let html = `<h3>${date}（${weekdayLabel}） の空き時間</h3>`;
+      if (availableCount === 0) {
+        html += "<p>空きがありません。</p>";
+        area.innerHTML = html;
+        return;
+      }
+
+      html += `
+        <p>※ 1コマ（2時間）3,000円 / 2コマ（4時間）5,000円</p>
+        <div class="slot-group-title">1コマ（2時間）</div>
+      `;
+      area.innerHTML = html;
+
+      single.forEach(o => {
+        const e = document.createElement("div");
+        e.className = "slot-item single";
+        e.dataset.offerId = o.id;
+        if (!o.available) e.classList.add("disabled");
+
+        const label = document.createElement("span");
+        label.className = "slot-label";
+        label.textContent = o.label;
+
+        const meta = document.createElement("span");
+        meta.className = "slot-meta";
+        meta.innerHTML = `<span class="slot-price">¥${o.price.toLocaleString()}</span> / 1コマ`;
+
+        e.appendChild(label);
+        e.appendChild(meta);
+
+        if (o.available) {
+          e.onclick = () => toggleSlotSelection(date, o, e);
+        }
+
+        area.appendChild(e);
+      });
+
+      const doubleTitle = document.createElement("div");
+      doubleTitle.className = "slot-group-title";
+      doubleTitle.textContent = "2コマ（4時間）";
+      area.appendChild(doubleTitle);
+
+      double.forEach(o => {
+        const e = document.createElement("div");
+        e.className = "slot-item double";
+        e.dataset.offerId = o.id;
+        if (!o.available) e.classList.add("disabled");
+
+        const label = document.createElement("span");
+        label.className = "slot-label";
+        label.textContent = o.label;
+
+        const meta = document.createElement("span");
+        meta.className = "slot-meta";
+        meta.innerHTML = `<span class="slot-price">¥${o.price.toLocaleString()}</span> / 2コマ`;
+
+        e.appendChild(label);
+        e.appendChild(meta);
+
+        if (o.available) {
+          e.onclick = () => toggleSlotSelection(date, o, e);
+        }
+
+        area.appendChild(e);
+      });
+    }
+
+    function toggleSlotSelection(dateStr, offer, element) {
+      if (!currentSelectedDate) currentSelectedDate = dateStr;
+      if (currentSelectedDate !== dateStr) {
+        // 他の日が選ばれていたらリセットしてこの日に切り替える
+        currentSelectedDate = dateStr;
+        selectedSlots = [];
+        document.querySelectorAll(".slot-item.selected").forEach(el => {
+          el.classList.remove("selected");
+        });
+      }
+
+      const existingIndex = selectedSlots.findIndex(s => s.offer.id === offer.id);
+      if (existingIndex >= 0) {
+        // すでに選択済み → 解除
+        selectedSlots.splice(existingIndex, 1);
+        element.classList.remove("selected");
+        renderSelectionForm();
+        return;
+      }
+
+      // これから選択するパターン
+      if (offer.blocks.length === 1) {
+        // 1コマ選択時：同じブロックを含む2コマがすでに選択されていたら選べない
+        const hasDoubleConflict = selectedSlots.some(
+          s =>
+            s.offer.blocks.length > 1 &&
+            s.offer.blocks.some(b => offer.blocks.includes(b))
+        );
+        if (hasDoubleConflict) {
+          alert("この時間帯は、すでに2コマ予約として選択されています。");
+          return;
+        }
+      } else {
+        // 2コマ選択時：重なる1コマはまとめて外す
+        selectedSlots = selectedSlots.filter(s => {
+          const overlaps = s.offer.blocks.some(b => offer.blocks.includes(b));
+          if (overlaps) {
+            const el = document.querySelector(`.slot-item[data-offer-id="${s.offer.id}"]`);
+            if (el) el.classList.remove("selected");
+          }
+          return !overlaps;
+        });
+      }
+
+      const { startISO, endISO } = buildDateTimeForOffer(dateStr, offer);
+      selectedSlots.push({ offer, startISO, endISO });
+      element.classList.add("selected");
+
+      // 1コマが2つそろったら2コマにまとめる
+      normalizeDoubleSelections(dateStr);
+      renderSelectionForm();
+    }
+
+    function normalizeDoubleSelections(dateStr) {
+      if (!currentSelectedDate || currentSelectedDate !== dateStr) return;
+
+      DOUBLE_OFFERS.forEach(doubleOffer => {
+        const alreadySelected = selectedSlots.some(s => s.offer.id === doubleOffer.id);
+        if (alreadySelected) return;
+
+        const neededBlocks = new Set(doubleOffer.blocks);
+        const singleSelections = selectedSlots.filter(
+          s =>
+            s.offer.blocks.length === 1 &&
+            s.offer.blocks.every(b => neededBlocks.has(b))
+        );
+        if (singleSelections.length < doubleOffer.blocks.length) return;
+
+        const blocksCovered = new Set();
+        singleSelections.forEach(s =>
+          s.offer.blocks.forEach(b => blocksCovered.add(b))
+        );
+        const allCovered = doubleOffer.blocks.every(b => blocksCovered.has(b));
+        if (!allCovered) return;
+
+        // 単コマ選択を外して2コマにまとめる
+        singleSelections.forEach(s => {
+          const idx = selectedSlots.indexOf(s);
+          if (idx >= 0) selectedSlots.splice(idx, 1);
+          const el = document.querySelector(`.slot-item[data-offer-id="${s.offer.id}"]`);
+          if (el) el.classList.remove("selected");
+        });
+
+        const { startISO, endISO } = buildDateTimeForOffer(dateStr, doubleOffer);
+        selectedSlots.push({ offer: doubleOffer, startISO, endISO });
+        const doubleEl = document.querySelector(`.slot-item[data-offer-id="${doubleOffer.id}"]`);
+        if (doubleEl) doubleEl.classList.add("selected");
+      });
+    }
+
+    function buildDateTimeForOffer(dateStr, offer) {
+      // オファー内の最初/最後のブロックから開始・終了時刻を決定
+      const blocks = offer.blocks.map(
+        id => BASE_BLOCKS.find(b => b.id === id)
+      );
+      const first = blocks[0];
+      const last = blocks[blocks.length - 1];
+
+      const startISO = `${dateStr}T${first.startTime}:00+09:00`;
+      const endISO = `${dateStr}T${last.endTime}:00+09:00`;
+
+      return { startISO, endISO };
+    }
+
+    // 選択済みスロットに基づき予約フォームを表示
+    function renderSelectionForm() {
+      const div = document.getElementById("formArea");
+      if (!currentSelectedDate || selectedSlots.length === 0) {
+        div.innerHTML = "";
+        return;
+      }
+
+      const weekdayLabel = getWeekdayLabel(currentSelectedDate);
+      const total = selectedSlots.reduce((sum, s) => sum + s.offer.price, 0);
+      const singleCount = selectedSlots.filter(s => s.offer.blocks.length === 1).length;
+      const doubleCount = selectedSlots.filter(s => s.offer.blocks.length === 2).length;
+
+      const listItems = selectedSlots.map(s => {
+        const kind = s.offer.blocks.length === 1 ? "1コマ" : "2コマ";
+        const priceStr = `¥${s.offer.price.toLocaleString()}`;
+        return `<li>${s.offer.label}（${kind}） ${priceStr}</li>`;
+      }).join("");
+
+      div.innerHTML = `
+        <h3>予約情報入力</h3>
+        <p><strong>${currentSelectedDate}（${weekdayLabel}）</strong></p>
+        <p>選択中の時間帯：</p>
+        <ul>
+          ${listItems}
+        </ul>
+        <p>内訳：</p>
+        <p>1コマ（2時間）：${singleCount}つ<br>2コマ（4時間）：${doubleCount}つ</p>
+        <p><strong>合計金額：¥${total.toLocaleString()}</strong></p>
+
+        <p id="formGeneralError" class="error-text"></p>
+
+        <label>名前: <br><input id="name" style="width: 100%; padding: 6px;"></label>
+        <div id="nameError" class="error-text"></div><br>
+
+        <label>メール: <br><input id="email" style="width: 100%; padding: 6px;"></label>
+        <div id="emailError" class="error-text"></div><br>
+
+        <label><input type="checkbox" id="agree"> 利用規約に同意する</label>
+        <div id="agreeError" class="error-text"></div><br>
+
+        <button onclick="reserve()">予約を送信する</button>
+      `;
+    }
+
+    // 予約実行
+    function reserve() {
+      clearFormErrors();
+
+      if (!currentSelectedDate || selectedSlots.length === 0) {
+        const formError = document.getElementById("formGeneralError");
+        if (formError) formError.textContent = "予約したい時間帯を選択してください。";
+        return;
+      }
+
+      const slotsPayload = selectedSlots.map(s => ({
+        start: s.startISO,
+        end: s.endISO
+      }));
+
+      const email = document.getElementById("email").value.trim();
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      const data = {
+        name: document.getElementById("name").value.trim(),
+        email,
+        agree: document.getElementById("agree").checked,
+        slots: slotsPayload
+      };
+
+      let hasError = false;
+      if (!data.name) {
+        const el = document.getElementById("nameError");
+        if (el) el.textContent = "必須項目です";
+        hasError = true;
+      }
+      if (!data.email) {
+        const el = document.getElementById("emailError");
+        if (el) el.textContent = "必須項目です";
+        hasError = true;
+      } else if (!emailPattern.test(email)) {
+        const el = document.getElementById("emailError");
+        if (el) el.textContent = "メールアドレスの形式が正しくありません。例：example@icloud.com";
+        hasError = true;
+      }
+      if (!data.agree) {
+        const el = document.getElementById("agreeError");
+        if (el) el.textContent = "利用規約への同意が必要です";
+        hasError = true;
+      }
+
+      if (hasError) {
+        return;
+      }
+
+      // Apps Script 側の reserve() を呼び出す
+      const formAreaBeforeSubmit = document.getElementById("formArea");
+      if (formAreaBeforeSubmit) {
+        formAreaBeforeSubmit.innerHTML = `
+          <div class="loading">
+            <div class="loading-spinner"></div>
+            <span>予約内容を送信しています...</span>
+          </div>
+        `;
+      }
+
+      google.script.run
+        .withSuccessHandler(() => {
+          const formArea = document.getElementById("formArea");
+          if (formArea) {
+            formArea.innerHTML = `
+              <h3>予約の送信をしました</h3>
+              <p>ご入力いただいた内容をもとに予約を登録しました。</p>
+              <button onclick="resetReservation()">元の画面に戻る</button>
+            `;
+          }
+          const slotsDiv = document.getElementById("slots");
+          if (slotsDiv) slotsDiv.innerHTML = "";
+          currentSelectedDate = null;
+          selectedSlots = [];
+        })
+        .withFailureHandler(err => {
+          // エラー時はフォームを再表示してメッセージを出す
+          renderSelectionForm();
+          const formError = document.getElementById("formGeneralError");
+          if (formError) formError.textContent = "送信中にエラーが発生しました。時間をおいてお試しください。";
+          alert("エラー: " + err.message);
+        })
+        .reserve(data);
+    }
+
+    function resetReservation() {
+      selectedSlots = [];
+      currentSelectedDate = null;
+      const formArea = document.getElementById("formArea");
+      if (formArea) formArea.innerHTML = "";
+      const slotsDiv = document.getElementById("slots");
+      if (slotsDiv) slotsDiv.innerHTML = "";
+      loadCurrentMonth();
+    }
+
+    // イベント初期化
+    document.getElementById("prevMonthBtn").onclick = () => {
+      currentMonth.setMonth(currentMonth.getMonth() - 1);
+      loadCurrentMonth();
+      document.getElementById("slots").innerHTML = "";
+      document.getElementById("formArea").innerHTML = "";
+    };
+
+    document.getElementById("nextMonthBtn").onclick = () => {
+      currentMonth.setMonth(currentMonth.getMonth() + 1);
+      loadCurrentMonth();
+      document.getElementById("slots").innerHTML = "";
+      document.getElementById("formArea").innerHTML = "";
+    };
+
+    // 初期表示
+    loadCurrentMonth();
+  </script>
+</body>
+</html>
