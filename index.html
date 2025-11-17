@@ -236,9 +236,16 @@
 
     // 🔗 LINE連携用ベースURL（ここをあなたのLINE連携用WebアプリURLに差し替える）
     // 例: const lineLinkBaseUrl = 'https://script.google.com/macros/s/xxxx/exec?page=line';
-    const lineLinkBaseUrl = 'https://example.com/line-link';
+    // const lineLinkBaseUrl = 'https://script.google.com/macros/s/AKfycbynV77umUU0jXEX2UVb2qTYsYIjYVENVex-FhQkqVPHXC4Y_m0mer3muUbb2_7h1Aiu/exec';
+    // 🔗 LINEのBASIC ID（@から始まるやつ）
+    const LINE_BASIC_ID = "@095zhejy"; // 例: "@kamakura_space"
+
+    // 🔗 LINE連携用ベースURL（oaMessage のURLスキーム）
+    const lineLinkBaseUrl =
+      "https://line.me/R/oaMessage/" + encodeURIComponent(LINE_BASIC_ID) + "/?";
 
     // 基本ブロック（2時間単位）
+
     const BASE_BLOCKS = [
       { id: "A", startTime: "09:00", endTime: "11:00" },
       { id: "B", startTime: "11:00", endTime: "13:00" },
@@ -738,7 +745,7 @@
               <button onclick="resetReservation()">元の画面に戻る</button>
             `;
           } else {
-            const url = lineLinkBaseUrl + '?token=' + encodeURIComponent(token);
+            const url = lineLinkBaseUrl + encodeURIComponent("token=" + token);
             formArea.innerHTML = `
               <h3>予約の送信をしました</h3>
               <p>ご入力いただいた内容をもとに予約を登録しました。</p>

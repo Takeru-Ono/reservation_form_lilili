@@ -10,6 +10,10 @@ const CONFIG = {
   HOLIDAY_CALENDAR_ID: "ja.japanese#holiday@group.v.calendar.google.com",
   // 🔑 一旦固定の鍵番号（運用に合わせて変更）
   KEY_CODE: "1234",
+  // 🔔 LINE Messaging API 用アクセストークン（長期トークン）
+  LINE_ACCESS_TOKEN:
+    "XR/tH6PDysFVtEAtJBhHFb0DMJNTL5RNckKptVjpdLxi0FGD0lF4EGoG+1IIezNRFXLrp9BSA+SNoChm9HkxB9nE0mcbMuYNSJxq7g6q50k1g8OEaxDpHrFFQUFlEC70cqCcTLlFf/mvyu8OepaIWgdB04t89/1O/w1cDnyilFU=",
+  LINE_BASIC_ID: "@095zhejy",
 };
 
 // 時間帯パターン（フロントの index.html と同じ構成）
@@ -332,4 +336,195 @@ function buildFreeSlotsForDateFromEvents_(d, eventsForDay) {
   });
 
   return result;
+}
+// =========================
+// LINE Webhook 入口
+// =========================
+function doPost(e) {
+  try {
+    if (e && e.postData && e.postData.contents) {
+      const json = JSON.parse(e.postData.contents);
+      // 受信内容をログに出しておく（デバッグ用）
+      Logger.log(JSON.stringify(json, null, 2));
+      const events = json.events || [];
+      events.forEach(handleLineEvent_);
+    } else {
+      Logger.log("no postData");
+    }
+
+    return ContentService.createTextOutput("OK").setMimeType(
+      ContentService.MimeType.TEXT_PLAIN
+    );
+  } catch (err) {
+    Logger.log("ERROR in doPost: " + err);
+    return ContentService.createTextOutput("NG").setMimeType(
+      ContentService.MimeType.TEXT_PLAIN
+    );
+  }
+}
+
+// 各イベントの処理
+function handleLineEvent_(event) {
+  if (!event || !event.source || !event.source.userId) {
+    return;
+  }
+  const userId = event.source.userId;
+
+  // 今回使うのは message イベント（ユーザーが token を送ってくる）
+  if (
+    event.type === "message" &&
+    event.message &&
+    event.message.type === "text"
+  ) {
+    const text = (event.message.text || "").trim();
+    if (!text) return;
+
+    // text から token を抽出する
+    // 例: "token=R-20251117-XXXXXX" または "R-20251117-XXXXXX" だけでもOK
+    let token = null;
+    const m = text.match(/token\s*[:=]\s*([A-Za-z0-9\-]+)/i);
+    if (m && m[1]) {
+      token = m[1];
+    } else {
+      // 全体を token とみなすパターン
+      token = text;
+    }
+
+    linkTokenAndSendKey_(userId, token);
+  }
+}
+
+// token と userId をスプレッドシートで紐づけて、鍵番号を送信
+function linkTokenAndSendKey_(userId, token) {
+  if (!token) {
+    sendLineMessage_(
+      userId,
+      "予約トークンが読み取れませんでした。もう一度お試しください。"
+    );
+    return;
+  }
+
+  if (!CONFIG.SHEET_ID) {
+    sendLineMessage_(
+      userId,
+      "内部エラー：予約ログ用のシートが設定されていません。"
+    );
+    return;
+  }
+
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const sheet = ss.getSheetByName("log") || ss.insertSheet("log");
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    sendLineMessage_(userId, "予約情報が見つかりませんでした。");
+    return;
+  }
+
+  // 1行目はヘッダ想定の場合があるので、2行目から検索
+  const rowsForToken = [];
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    // row = [timestamp, start, end, name, email, agree, token, keyCode, line_user_id]
+    const rowToken = row[6];
+    if (rowToken === token) {
+      rowsForToken.push({ index: i + 1, row: row }); // index は 1-based
+    }
+  }
+
+  if (rowsForToken.length === 0) {
+    sendLineMessage_(
+      userId,
+      "ご入力いただいたトークンに一致する予約が見つかりませんでした。"
+    );
+    return;
+  }
+
+  // 該当する全行に userId をセット
+  rowsForToken.forEach((info) => {
+    sheet.getRange(info.index, 9).setValue(userId); // 9列目: line_user_id
+  });
+
+  // メッセージ用に、代表1行から情報を取得
+  const firstRow = rowsForToken[0].row;
+  const name = firstRow[3];
+  const keyCodeFromRow = firstRow[7] || CONFIG.KEY_CODE;
+  const startTimes = rowsForToken.map((info) => new Date(info.row[1]));
+  const endTimes = rowsForToken.map((info) => new Date(info.row[2]));
+
+  // まとめて表示用に最小開始・最大終了を計算
+  let minStart = startTimes[0];
+  let maxEnd = endTimes[0];
+  startTimes.forEach((d) => {
+    if (d < minStart) minStart = d;
+  });
+  endTimes.forEach((d) => {
+    if (d > maxEnd) maxEnd = d;
+  });
+
+  const dateStr = Utilities.formatDate(
+    minStart,
+    CONFIG.TIMEZONE,
+    "yyyy/MM/dd（E）"
+  );
+  const startStr = Utilities.formatDate(minStart, CONFIG.TIMEZONE, "HH:mm");
+  const endStr = Utilities.formatDate(maxEnd, CONFIG.TIMEZONE, "HH:mm");
+
+  const message =
+    "ご予約ありがとうございます！\n\n" +
+    "【予約内容】\n" +
+    `日付：${dateStr}\n` +
+    `時間：${startStr} - ${endStr}\n` +
+    (name ? `お名前：${name}\n` : "") +
+    "\n" +
+    "【鍵番号】\n" +
+    `${keyCodeFromRow}\n\n` +
+    "ご利用後は、このトークに片付け後の写真を送信してください。";
+
+  sendLineMessage_(userId, message);
+}
+
+// LINE への push メッセージ送信
+function sendLineMessage_(userId, text) {
+  if (!CONFIG.LINE_ACCESS_TOKEN) {
+    Logger.log("LINE_ACCESS_TOKEN が設定されていません。");
+    return;
+  }
+  const url = "https://api.line.me/v2/bot/message/push";
+  const payload = {
+    to: userId,
+    messages: [{ type: "text", text: text }],
+  };
+
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    headers: {
+      Authorization: "Bearer " + CONFIG.LINE_ACCESS_TOKEN,
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  };
+
+  const res = UrlFetchApp.fetch(url, options);
+  Logger.log(
+    "LINE push response: " + res.getResponseCode() + " " + res.getContentText()
+  );
+}
+
+function pushTest() {
+  const userId = "U68a910db5be118849f479d4a8ed57351";
+  const token =
+    "XR/tH6PDysFVtEAtJBhHFb0DMJNTL5RNckKptVjpdLxi0FGD0lF4EGoG+1IIezNRFXLrp9BSA+SNoChm9HkxB9nE0mcbMuYNSJxq7g6q50k1g8OEaxDpHrFFQUFlEC70cqCcTLlFf/mvyu8OepaIWgdB04t89/1O/w1cDnyilFU="; // Messaging API設定で発行したやつ
+
+  UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push", {
+    method: "post",
+    contentType: "application/json",
+    headers: { Authorization: "Bearer " + token },
+    payload: JSON.stringify({
+      to: userId,
+      messages: [
+        { type: "text", text: "学びのかまくらテスト：push 通知成功！" },
+      ],
+    }),
+  });
 }
