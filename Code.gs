@@ -6,20 +6,18 @@
 // TODO: 写真を受け取った時のフロー（AIで関係ない写真の判別までするべきかどうか→しなくていい気がする）
 // TODO: アクセスが集中すると見えないことが多い
 
-// CONFIG: 必要に応じて書き換え
+// ====== Script Properties 読み込み ======
+const PROPS = PropertiesService.getScriptProperties();
+
 const CONFIG = {
-  CALENDAR_ID:
-    "a4ed87307ab06b345c403972316685e56ec1dc6f5e90e87bf871315c7cc8f441@group.calendar.google.com",
-  SHEET_ID: "1BTvhL9WKzcjnzALnnwZD92T9uzhzlnyDmOpllHK3DBA",
+  CALENDAR_ID: PROPS.getProperty("CALENDAR_ID"),
+  SHEET_ID: PROPS.getProperty("SHEET_ID"),
   TIMEZONE: "Asia/Tokyo",
-  // 日本の祝日カレンダー（必要に応じて変更可）
   HOLIDAY_CALENDAR_ID: "ja.japanese#holiday@group.v.calendar.google.com",
-  // 🔑 一旦固定の鍵番号（運用に合わせて変更）
-  KEY_CODE: "1234",
-  // 🔔 LINE Messaging API 用アクセストークン（長期トークン）
-  LINE_ACCESS_TOKEN:
-    "XR/tH6PDysFVtEAtJBhHFb0DMJNTL5RNckKptVjpdLxi0FGD0lF4EGoG+1IIezNRFXLrp9BSA+SNoChm9HkxB9nE0mcbMuYNSJxq7g6q50k1g8OEaxDpHrFFQUFlEC70cqCcTLlFf/mvyu8OepaIWgdB04t89/1O/w1cDnyilFU=",
-  LINE_BASIC_ID: "@095zhejy",
+
+  KEY_CODE: PROPS.getProperty("KEY_CODE"), // 固定鍵番号
+  LINE_ACCESS_TOKEN: PROPS.getProperty("LINE_ACCESS_TOKEN"),
+  LINE_BASIC_ID: PROPS.getProperty("LINE_BASIC_ID"),
 };
 
 // 時間帯パターン（フロントの index.html と同じ構成）
@@ -519,8 +517,7 @@ function sendLineMessage_(userId, text) {
 
 function pushTest() {
   const userId = "U68a910db5be118849f479d4a8ed57351";
-  const token =
-    "XR/tH6PDysFVtEAtJBhHFb0DMJNTL5RNckKptVjpdLxi0FGD0lF4EGoG+1IIezNRFXLrp9BSA+SNoChm9HkxB9nE0mcbMuYNSJxq7g6q50k1g8OEaxDpHrFFQUFlEC70cqCcTLlFf/mvyu8OepaIWgdB04t89/1O/w1cDnyilFU="; // Messaging API設定で発行したやつ
+  const token = CONFIG.LINE_ACCESS_TOKEN; // Messaging API設定で発行したやつ
 
   UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push", {
     method: "post",

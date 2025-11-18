@@ -244,6 +244,12 @@
     const lineLinkBaseUrl =
       "https://line.me/R/oaMessage/" + encodeURIComponent(LINE_BASIC_ID) + "/?";
 
+        // 🔽 ここから追加：サーバー呼び出し結果のキャッシュ
+    // 月ごとの空き状況キャッシュ: key = "2025-11" みたいな文字列
+    const availabilityCache = {};
+    // 日ごとのスロットキャッシュ: key = "2025-11-22"
+    const slotsCache = {};
+
     // 基本ブロック（2時間単位）
 
     const BASE_BLOCKS = [
@@ -309,6 +315,15 @@
       });
     }
 
+    function clearCaches() {
+      for (const k in availabilityCache) {
+        delete availabilityCache[k];
+      }
+      for (const k in slotsCache) {
+        delete slotsCache[k];
+      }
+    }
+
     function showLoading(targetId) {
       const el = document.getElementById(targetId);
       if (!el) return;
@@ -326,9 +341,22 @@
     function loadCurrentMonth() {
       const year = currentMonth.getFullYear();
       const month = currentMonth.getMonth() + 1; // 1-12
+      const key = `${year}-${String(month).padStart(2, "0")}`;
+
+      // 🌟 すでに同じ月を読み込んでいれば、キャッシュから即表示
+      const cached = availabilityCache[key];
+      if (cached) {
+        renderCurrentMonth(cached);
+        return;
+      }
+
+      // キャッシュがなければサーバーへ
       showLoading("dates");
       google.script.run
-        .withSuccessHandler(renderCurrentMonth)
+        .withSuccessHandler(list => {
+          availabilityCache[key] = list; // キャッシュに保存
+          renderCurrentMonth(list);
+        })
         .getAvailability(year, month);
     }
 
@@ -409,11 +437,21 @@
       currentSelectedDate = date;
       selectedSlots = [];
 
-      const area = document.getElementById("slots");
       const weekdayLabel = getWeekdayLabel(date);
 
+      // 🌟 すでに同じ日付のスロットを読み込んでいればキャッシュから表示
+      const cached = slotsCache[date];
+      if (cached) {
+        renderSlotsForDate(date, weekdayLabel, cached);
+        return;
+      }
+
+      // キャッシュがなければサーバーへ
       google.script.run
-        .withSuccessHandler(slots => renderSlotsForDate(date, weekdayLabel, slots))
+        .withSuccessHandler(slots => {
+          slotsCache[date] = slots; // キャッシュ保存
+          renderSlotsForDate(date, weekdayLabel, slots);
+        })
         .getSlots(date);
     }
 
@@ -669,6 +707,7 @@
     // 予約実行
     function reserve() {
       clearFormErrors();
+     
 
       if (!currentSelectedDate || selectedSlots.length === 0) {
         const formError = document.getElementById("formGeneralError");
@@ -755,6 +794,7 @@
               <button onclick="resetReservation()">元の画面に戻る</button>
             `;
           }
+          clearCaches();
 
           currentSelectedDate = null;
           selectedSlots = [];
