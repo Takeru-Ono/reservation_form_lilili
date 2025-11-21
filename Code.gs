@@ -49,6 +49,10 @@ function include(filename) {
 // 月単位の空き状況（◎/△/×）取得
 // =========================
 // フロントから year, month(1-12) が渡される想定
+// ※ Calendar API の呼び出し回数を減らすため、
+//    - その月のイベントを一括取得
+//    - その月の祝日を一括取得
+//    - 結果を CacheService に数分キャッシュ
 function getAvailability(year, month) {
   if (!year || !month) {
     throw new Error("getAvailability: year, month が必要です");
@@ -65,16 +69,48 @@ function getAvailability(year, month) {
     ? CalendarApp.getCalendarById(CONFIG.HOLIDAY_CALENDAR_ID)
     : null;
 
-  const results = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // --- 月ごとの結果をキャッシュ ---
+  const cache = CacheService.getScriptCache();
+  const cacheKey = "availability_" + year + "_" + month;
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (e) {
+      // パース失敗時は再計算
+      Logger.log("availability cache parse error: " + e);
+    }
+  }
 
+  const results = [];
   const firstDay = new Date(year, month - 1, 1);
   const lastDay = new Date(year, month, 0); // month の最終日
 
-  // 1日分のイベント/祝日をキャッシュするマップ
-  const dayEventCache = {};
-  const holidayCache = {};
+  // その月のイベントをまとめて取得（終端を 23:59:59 まで広げる）
+  const rangeEnd = new Date(lastDay);
+  rangeEnd.setHours(23, 59, 59, 999);
+
+  const monthlyEvents = cal.getEvents(firstDay, rangeEnd);
+  const eventsByDate = {};
+  monthlyEvents.forEach((ev) => {
+    const start = ev.getStartTime();
+    const key = formatDate_(start);
+    if (!eventsByDate[key]) {
+      eventsByDate[key] = [];
+    }
+    eventsByDate[key].push(ev);
+  });
+
+  // 祝日も月単位で取得
+  const holidayMap = {};
+  if (holidayCal) {
+    const holidayEvents = holidayCal.getEvents(firstDay, rangeEnd);
+    holidayEvents.forEach((ev) => {
+      const start = ev.getStartTime();
+      const key = formatDate_(start);
+      holidayMap[key] = true;
+    });
+  }
 
   for (
     let d = new Date(firstDay);
@@ -83,14 +119,13 @@ function getAvailability(year, month) {
   ) {
     const dateKey = formatDate_(d);
 
-    // 祝日判定（キャッシュ付き）
-    const isHol = isHolidayCached_(holidayCal, d, holidayCache);
+    const isHol = !!holidayMap[dateKey];
 
     // 「営業日」かどうか判定（土日 or 祝日を営業日とみなしている）
     if (!isBusinessDay_(d, isHol)) continue;
 
-    // その日のイベント一覧（キャッシュ付き）
-    const eventsForDay = getEventsForDayCached_(cal, d, dayEventCache);
+    // その日のイベント一覧（事前にまとめて取得したものから取り出す）
+    const eventsForDay = eventsByDate[dateKey] || [];
 
     // 1日分の枠のうち空きがいくつあるか
     const { freeCount, totalCount } = countFreeSlotsForDateFromEvents_(
@@ -108,6 +143,9 @@ function getAvailability(year, month) {
       isHoliday: isHol,
     });
   }
+
+  // 計算結果を数分キャッシュ（例: 5分 = 300秒）
+  cache.put(cacheKey, JSON.stringify(results), 300);
 
   return results;
 }

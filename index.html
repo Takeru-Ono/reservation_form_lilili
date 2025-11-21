@@ -577,16 +577,19 @@
 
       // これから選択するパターン
       if (offer.blocks.length === 1) {
-        // 1コマ選択時：同じブロックを含む2コマがすでに選択されていたら選べない
-        const hasDoubleConflict = selectedSlots.some(
-          s =>
-            s.offer.blocks.length > 1 &&
-            s.offer.blocks.some(b => offer.blocks.includes(b))
-        );
-        if (hasDoubleConflict) {
-          alert("この時間帯は、すでに2コマ予約として選択されています。");
-          return;
-        }
+        // 1コマ選択時：同じブロックを含む2コマがすでに選択されていたら、2コマ側を外す
+        selectedSlots = selectedSlots.filter(s => {
+          const isDouble = s.offer.blocks.length > 1;
+          const overlaps =
+            isDouble && s.offer.blocks.some(b => offer.blocks.includes(b));
+          if (overlaps) {
+            const el = document.querySelector(
+              `.slot-item[data-offer-id="${s.offer.id}"]`
+            );
+            if (el) el.classList.remove("selected");
+          }
+          return !overlaps;
+        });
       } else {
         // 2コマ選択時：重なる1コマはまとめて外す
         selectedSlots = selectedSlots.filter(s => {
