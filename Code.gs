@@ -202,6 +202,21 @@ function reserve(data) {
     end: new Date(s.end),
   }));
 
+  // 利用目的・利用人数・LINE登録チェック
+  const purpose = data.purpose;
+  const peopleCount = Number(data.peopleCount);
+  const lineRegistered = !!data.lineRegistered;
+
+  if (!purpose) {
+    throw new Error("利用目的が入力されていません");
+  }
+  if (!peopleCount || isNaN(peopleCount) || peopleCount <= 0) {
+    throw new Error("利用人数が正しく入力されていません");
+  }
+  if (!lineRegistered) {
+    throw new Error("公式LINEアカウント登録のチェックが必要です");
+  }
+
   // 🔑 トークン & 鍵番号生成
   const token = generateToken_();
   const keyCode = CONFIG.KEY_CODE;
@@ -239,7 +254,11 @@ function reserve(data) {
         data.agree,
         token, // 予約トークン
         keyCode, // 鍵番号
-        "", // line_user_id（今後LINEと紐づける用）
+        "", // line_user_id（LINEユーザーID）
+        purpose, // 利用目的
+        peopleCount, // 利用人数
+        "", // link_status
+        "", // link_updated_at
       ]);
     });
   }
@@ -412,7 +431,7 @@ function handleLineEvent_(event) {
   }
   const userId = event.source.userId;
 
-  // 今回使うのは message イベント（ユーザーが token を送ってくる）
+  // 今回使うのは message イベント（ユーザーが token または利用情報を送ってくる）
   if (
     event.type === "message" &&
     event.message &&
@@ -428,12 +447,105 @@ function handleLineEvent_(event) {
     if (m && m[1]) {
       token = m[1];
     } else {
-      // 全体を token とみなすパターン
-      token = text;
+      // "R-YYYYMMDD-XXXXXX" 形式だけが送られてきた場合
+      const m2 = text.match(/R-\d{8}-[A-Za-z0-9]+/);
+      if (m2 && m2[0]) {
+        token = m2[0];
+      }
     }
 
-    linkTokenAndSendKey_(userId, token);
+    if (token) {
+      linkTokenAndSendKey_(userId, token);
+    } else {
+      // token が含まれていない場合は、利用者数・利用目的の登録とみなす
+      handleUsageInfo_(userId, text);
+    }
   }
+}
+
+// 利用者数 / 利用目的 メッセージの処理
+function handleUsageInfo_(userId, text) {
+  if (!CONFIG.SHEET_ID) {
+    sendLineMessage_(
+      userId,
+      "内部エラー：予約ログ用のシートが設定されていません。"
+    );
+    return;
+  }
+
+  const numMatch = text.match(/利用者数\s*[:：]\s*(\d+)/);
+  const purposeMatch = text.match(/利用目的\s*[:：]\s*([\s\S]+)/);
+
+  if (!numMatch || !purposeMatch) {
+    sendLineMessage_(
+      userId,
+      "メッセージの形式を認識できませんでした。\n\n" +
+        "次の形式で送信してください。\n\n" +
+        "利用者数 : （数字のみ）\n" +
+        "利用目的 : （自由記述）"
+    );
+    return;
+  }
+
+  const numUsers = Number(numMatch[1]);
+  const purpose = purposeMatch[1].trim();
+
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const sheet = ss.getSheetByName("log") || ss.insertSheet("log");
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    sendLineMessage_(userId, "予約情報が見つかりませんでした。");
+    return;
+  }
+
+  const now = new Date();
+  let target = null;
+
+  // userId が一致し、かつこれからの予約の中で一番近いものを探す
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const rowUserId = row[8]; // line_user_id
+    const start = row[1]; // start
+    if (!rowUserId || rowUserId !== userId) continue;
+    if (!(start instanceof Date)) continue;
+    if (start.getTime() <= now.getTime()) continue;
+
+    // すでに利用者数/目的が入っている場合はスキップ
+    if (row[9] || row[10]) continue;
+
+    if (!target || start.getTime() < target.start.getTime()) {
+      target = { index: i + 1, row: row, start: start };
+    }
+  }
+
+  if (!target) {
+    sendLineMessage_(
+      userId,
+      "これからの予約で、まだ利用者数・利用目的が登録されているものが見つかりませんでした。"
+    );
+    return;
+  }
+
+  // シートに反映
+  sheet.getRange(target.index, 10).setValue(numUsers); // 利用者数
+  sheet.getRange(target.index, 11).setValue(purpose); // 利用目的
+
+  const dateStr = Utilities.formatDate(
+    target.start,
+    CONFIG.TIMEZONE,
+    "yyyy/MM/dd（E）"
+  );
+  const startStr = Utilities.formatDate(target.start, CONFIG.TIMEZONE, "HH:mm");
+
+  sendLineMessage_(
+    userId,
+    "以下の予約に、利用者数と利用目的を登録しました。\n\n" +
+      `日付：${dateStr}\n` +
+      `開始時間：${startStr}\n` +
+      `利用者数：${numUsers}人\n` +
+      `利用目的：${purpose}\n\n` +
+      "ご利用開始の24時間前に暗証番号をお送りします。"
+  );
 }
 
 // token と userId をスプレッドシートで紐づけて、鍵番号を送信
@@ -466,7 +578,7 @@ function linkTokenAndSendKey_(userId, token) {
   const rowsForToken = [];
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    // row = [timestamp, start, end, name, email, agree, token, keyCode, line_user_id]
+    // row = [timestamp, start, end, name, email, agree, token, keyCode, line_user_id, num_users, purpose, key_sent_at, reminder_sent_at]
     const rowToken = row[6];
     if (rowToken === token) {
       rowsForToken.push({ index: i + 1, row: row }); // index は 1-based
@@ -489,7 +601,6 @@ function linkTokenAndSendKey_(userId, token) {
   // メッセージ用に、代表1行から情報を取得
   const firstRow = rowsForToken[0].row;
   const name = firstRow[3];
-  const keyCodeFromRow = firstRow[7] || CONFIG.KEY_CODE;
   const startTimes = rowsForToken.map((info) => new Date(info.row[1]));
   const endTimes = rowsForToken.map((info) => new Date(info.row[2]));
 
@@ -518,11 +629,143 @@ function linkTokenAndSendKey_(userId, token) {
     `時間：${startStr} - ${endStr}\n` +
     (name ? `お名前：${name}\n` : "") +
     "\n" +
-    "【鍵番号】\n" +
-    `${keyCodeFromRow}\n\n` +
+    "【ご利用前のお願い】\n" +
+    "この予約番号に対応するご利用内容を、次のフォーマットに沿ってこのトークに送ってください。\n\n" +
+    "利用者数 : \n" +
+    "利用目的 : \n\n" +
+    "※ご利用開始の24時間前までに上記のフォーマットで送信してください。\n" +
+    "　内容を確認後、ご利用開始の24時間前に暗証番号をお送りします。\n" +
+    "\n" +
     "ご利用後は、このトークに片付け後の写真を送信してください。";
 
   sendLineMessage_(userId, message);
+}
+
+// 24時間以内に利用開始となる予約に暗証番号を送信する
+// 時間主導型トリガー（例: 1時間ごと）から呼び出す想定
+function sendKeysForUpcomingReservations() {
+  if (!CONFIG.SHEET_ID) {
+    Logger.log("SHEET_ID が設定されていません。");
+    return;
+  }
+
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const sheet = ss.getSheetByName("log") || ss.insertSheet("log");
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return;
+
+  const now = new Date();
+  const oneDayMs = 24 * 60 * 60 * 1000;
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    // row = [timestamp, start, end, name, email, agree, token, keyCode, line_user_id, num_users, purpose, key_sent_at, reminder_sent_at]
+    const start = row[1];
+    const name = row[3];
+    const userId = row[8];
+    const numUsers = row[9];
+    const purpose = row[10];
+    const keySentAt = row[11];
+
+    if (!userId) continue;
+    if (!(start instanceof Date)) continue;
+    if (!numUsers || !purpose) continue;
+    if (keySentAt) continue; // すでに送信済み
+
+    const diff = start.getTime() - now.getTime();
+    if (diff <= 0) continue; // すでに開始時刻を過ぎている
+    if (diff > oneDayMs) continue; // 24時間より先の予約
+
+    const keyCodeFromRow = row[7] || CONFIG.KEY_CODE;
+
+    const dateStr = Utilities.formatDate(
+      start,
+      CONFIG.TIMEZONE,
+      "yyyy/MM/dd（E）"
+    );
+    const startStr = Utilities.formatDate(start, CONFIG.TIMEZONE, "HH:mm");
+
+    const message =
+      "ご利用開始まで24時間を切りましたので、暗証番号をお送りします。\n\n" +
+      "【予約内容】\n" +
+      `日付：${dateStr}\n` +
+      `時間：${startStr} - （2時間または4時間）\n` +
+      (name ? `お名前：${name}\n` : "") +
+      `利用者数：${numUsers}人\n` +
+      `利用目的：${purpose}\n\n` +
+      "【暗証番号】\n" +
+      `${keyCodeFromRow}\n\n` +
+      "ご利用後は、このトークに片付け後の写真を送信してください。";
+
+    sendLineMessage_(userId, message);
+
+    // 鍵送信済みフラグをセット
+    sheet.getRange(i + 1, 12).setValue(new Date());
+  }
+}
+
+// 利用者数・利用目的が未登録の予約に対して、開始約25時間前にリマインドを送信する
+// 時間主導型トリガー（例: 1時間ごと）から呼び出す想定
+function sendUsageInfoReminders() {
+  if (!CONFIG.SHEET_ID) {
+    Logger.log("SHEET_ID が設定されていません。");
+    return;
+  }
+
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const sheet = ss.getSheetByName("log") || ss.insertSheet("log");
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return;
+
+  const now = new Date();
+  const oneHourMs = 60 * 60 * 1000;
+  const twentyFourHoursMs = 24 * oneHourMs;
+  const twentyFiveHoursMs = 25 * oneHourMs;
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    // row = [timestamp, start, end, name, email, agree, token, keyCode, line_user_id, num_users, purpose, key_sent_at, reminder_sent_at]
+    const start = row[1];
+    const name = row[3];
+    const userId = row[8];
+    const numUsers = row[9];
+    const purpose = row[10];
+    const reminderSentAt = row[12];
+
+    if (!userId) continue;
+    if (!(start instanceof Date)) continue;
+    if (numUsers || purpose) continue; // すでに登録済み
+    if (reminderSentAt) continue; // すでにリマインド済み
+
+    const diff = start.getTime() - now.getTime();
+    if (diff <= twentyFourHoursMs) continue; // すでに24時間を切っている
+    if (diff > twentyFiveHoursMs) continue; // 25時間より先
+
+    const dateStr = Utilities.formatDate(
+      start,
+      CONFIG.TIMEZONE,
+      "yyyy/MM/dd（E）"
+    );
+    const startStr = Utilities.formatDate(start, CONFIG.TIMEZONE, "HH:mm");
+
+    const message =
+      "【ご予約内容のご確認】\n\n" +
+      `日付：${dateStr}\n` +
+      `開始時間：${startStr}\n` +
+      (name ? `お名前：${name}\n` : "") +
+      "\n" +
+      "ご利用開始の24時間前までに、以下のフォーマットで\n" +
+      "「利用者数」と「利用目的」をこのトークにご返信ください。\n\n" +
+      "利用者数 : \n" +
+      "利用目的 : \n\n" +
+      "まだご入力が確認できていません。このまま24時間前までにご連絡がない場合、\n" +
+      "予約がキャンセルされる場合があります。";
+
+    sendLineMessage_(userId, message);
+
+    // リマインド送信済みフラグをセット
+    sheet.getRange(i + 1, 13).setValue(new Date());
+  }
 }
 
 // LINE への push メッセージ送信

@@ -2,6 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>学びのかまくら レンタルスペース予約フォーム</title>
   <style>
     body {
@@ -141,7 +142,7 @@
       background: #fff;
     }
     .slot-item.single { border-color: #f36c21; background: #fff4ea; }
-    .slot-item.double { border-color: #c24d16; background: #ffe4d1; }
+    .slot-item.double { border-color: #f36c21; background: #fff4ea; }
     .slot-item:hover { background: #f7f0ea; }
     .slot-item.selected {
       box-shadow: 0 0 0 2px #f36c21 inset;
@@ -158,13 +159,14 @@
       margin-top: 4px;
     }
     button {
-      padding: 8px 18px;
+      padding: 10px 20px;
       border-radius: 4px;
       border: none;
       background: #f36c21;
       color: #fff;
-      font-size: 0.9rem;
+      font-size: 1rem;
       cursor: pointer;
+      min-height: 44px;
     }
     button:hover {
       background: #d95c19;
@@ -211,7 +213,50 @@
       font-size: 0.85rem;
     }
 
-    /* 必要であればここに今後のレスポンシブ調整を追加 */
+    /* モバイル向けの調整 */
+    @media (max-width: 600px) {
+      body {
+        padding: 16px 12px 32px;
+      }
+      h1 {
+        font-size: 1.6rem;
+      }
+      h2 {
+        font-size: 1.1rem;
+      }
+      .month-nav {
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      #dates {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+      .date-item {
+        padding: 8px 6px;
+      }
+      .date-label {
+        font-size: 0.85rem;
+      }
+      .date-status {
+        font-size: 0.75rem;
+      }
+      .slot-item {
+        padding: 10px 12px;
+        min-height: 44px;
+      }
+      .slot-label {
+        font-size: 0.95rem;
+      }
+      .slot-meta {
+        font-size: 0.8rem;
+      }
+      button,
+      a.button-link {
+        width: 100%;
+        text-align: center;
+      }
+    }
   </style>
 </head>
 <body>
@@ -309,7 +354,15 @@
     let selectedSlots = [];
 
     function clearFormErrors() {
-      ["formGeneralError", "nameError", "emailError", "agreeError"].forEach(id => {
+      [
+        "formGeneralError",
+        "nameError",
+        "emailError",
+        "purposeError",
+        "peopleCountError",
+        "agreeError",
+        "lineRegisteredError",
+      ].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.textContent = "";
       });
@@ -700,8 +753,24 @@
         <label>メール: <br><input id="email" style="width: 100%; padding: 6px;"></label>
         <div id="emailError" class="error-text"></div><br>
 
+        <label>利用目的: <br>
+          <textarea id="purpose" style="width: 100%; padding: 6px;" rows="3" placeholder="例：親子の学習会での利用など"></textarea>
+        </label>
+        <div id="purposeError" class="error-text"></div><br>
+
+        <label>利用人数: <br>
+          <input id="peopleCount" type="number" min="1" style="width: 100%; padding: 6px;" placeholder="例：3">
+        </label>
+        <div id="peopleCountError" class="error-text"></div><br>
+
         <label><input type="checkbox" id="agree"> 利用規約に同意する</label>
         <div id="agreeError" class="error-text"></div><br>
+
+        <label>
+          <input type="checkbox" id="lineRegistered">
+          公式LINEアカウントを登録しました／これから登録します
+        </label>
+        <div id="lineRegisteredError" class="error-text"></div><br>
 
         <button onclick="reserve()">予約を送信する</button>
       `;
@@ -725,10 +794,17 @@
 
       const email = document.getElementById("email").value.trim();
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const purpose = document.getElementById("purpose").value.trim();
+      const peopleCountRaw = document.getElementById("peopleCount").value.trim();
+      const peopleCount = peopleCountRaw ? Number(peopleCountRaw) : null;
+      const lineRegistered = document.getElementById("lineRegistered").checked;
 
       const data = {
         name: document.getElementById("name").value.trim(),
         email,
+        purpose,
+        peopleCount,
+        lineRegistered,
         agree: document.getElementById("agree").checked,
         slots: slotsPayload
       };
@@ -748,9 +824,28 @@
         if (el) el.textContent = "メールアドレスの形式が正しくありません。例：example@icloud.com";
         hasError = true;
       }
+      if (!data.purpose) {
+        const el = document.getElementById("purposeError");
+        if (el) el.textContent = "必須項目です";
+        hasError = true;
+      }
+      if (peopleCount == null || Number.isNaN(peopleCount)) {
+        const el = document.getElementById("peopleCountError");
+        if (el) el.textContent = "必須項目です";
+        hasError = true;
+      } else if (peopleCount <= 0) {
+        const el = document.getElementById("peopleCountError");
+        if (el) el.textContent = "1以上の数字を入力してください";
+        hasError = true;
+      }
       if (!data.agree) {
         const el = document.getElementById("agreeError");
         if (el) el.textContent = "利用規約への同意が必要です";
+        hasError = true;
+      }
+      if (!lineRegistered) {
+        const el = document.getElementById("lineRegisteredError");
+        if (el) el.textContent = "公式LINEの登録について確認が必要です";
         hasError = true;
       }
 
@@ -787,11 +882,16 @@
               <button onclick="resetReservation()">元の画面に戻る</button>
             `;
           } else {
-            const url = lineLinkBaseUrl + encodeURIComponent("token=" + token);
+            const presetMessage =
+              "【学びのかまくら】レンタルスペース\n" +
+              "鍵番号や当日のご案内をLINEでお届けするための予約番号です。\n" +
+              "このまま送信してください。\n\n" +
+              token;
+            const url = lineLinkBaseUrl + encodeURIComponent(presetMessage);
             formArea.innerHTML = `
               <h3>予約の送信をしました</h3>
               <p>ご入力いただいた内容をもとに予約を登録しました。</p>
-              <p>LINEで鍵番号とご利用案内を受け取るには、下のボタンをタップしてください。</p>
+              <p>公式LINEで鍵番号と当日のご案内をお送りします。下のボタンから鍵受け取りステップに進んでください。</p>
               <p><a class="button-link" href="${url}" target="_blank" rel="noopener noreferrer">LINEで鍵を受け取る</a></p>
               <p class="hint">※スマートフォンで開いている場合、LINEアプリが起動することがあります。</p>
               <button onclick="resetReservation()">元の画面に戻る</button>
