@@ -881,7 +881,7 @@
 
         <label>
           <input type="checkbox" id="agree" disabled>
-          <a href="https://example.com/terms" id="termsExternalLink" target="_blank" rel="noopener noreferrer">利用規約</a>に同意する（<span id="showTerms" class="terms-link">内容を表示</span>）
+          <span id="termsText" class="terms-link">利用規約</span>に同意する（<span id="showTerms" class="terms-link">内容を表示</span>）
         </label>
         <div id="agreeError" class="error-text"></div><br>
 
@@ -902,13 +902,17 @@
       `;
 
       const termsLink = document.getElementById("showTerms");
-      if (termsLink) {
-        termsLink.onclick = (e) => {
+      const termsText = document.getElementById("termsText");
+      const attachTermsHandler = (el) => {
+        if (!el) return;
+        el.onclick = (e) => {
           e.preventDefault();
           e.stopPropagation();
           openTermsModal();
         };
-      }
+      };
+      attachTermsHandler(termsLink);
+      attachTermsHandler(termsText);
     }
 
     // 予約実行
