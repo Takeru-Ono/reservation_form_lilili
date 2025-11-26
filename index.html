@@ -1036,7 +1036,7 @@
           if (!token) {
             // トークンが取れなかった場合は従来どおりの完了表示＋戻る
             formArea.innerHTML = `
-              <h3>予約の送信をしました</h3>
+              <h3>予約の送信をしました！</h3>
               <p>ご入力いただいた内容をもとに予約を登録しました。</p>
               <p class="hint">※LINE連携用の情報取得に失敗しました。お手数ですが運営までお問い合わせください。</p>
               <button onclick="resetReservation()">元の画面に戻る</button>
@@ -1052,15 +1052,28 @@
               <h3>ご予約ありがとうございました！</h3>
               <p>
                 鍵番号や当日のご案内は、公式LINEでお送りします。<br>
-                下のボタンを押すと、LINEのトーク画面に予約番号がセットされますので、<br>
+                スマートフォンでご覧の場合は、下のボタンを押すとLINEのトーク画面に予約番号がセットされますので、<br>
                 <strong>そのまま送信してください。</strong>
               </p>
               <p><a class="button-link" href="${url}" target="_blank" rel="noopener noreferrer">LINEで鍵を受け取る</a></p>
               <p class="hint">
-                ※ご本人のスマートフォンから操作してください。<br>
+                ※PCでご覧の場合は、下のボックス内のURLをコピーして、ご自身のスマートフォンに送信し、スマホのブラウザやLINEから開いてください。<br>
                 ※リンクを他の方に転送しないようご注意ください。
               </p>
+              <div>
+                <input id="lineLinkRaw" type="text" style="width:100%; padding:6px; font-size:0.8rem;" readonly value="${url}">
+                <button type="button" id="copyLineLinkBtn" style="margin-top:6px;">リンクをコピーする</button>
+              </div>
             `;
+            const copyBtn = document.getElementById("copyLineLinkBtn");
+            if (copyBtn) {
+              copyBtn.onclick = () => {
+                const input = document.getElementById("lineLinkRaw");
+                if (!input) return;
+                const text = input.value;
+                copyLineUrl(text);
+              };
+            }
           }
           clearCaches();
 
@@ -1135,6 +1148,37 @@
     const termsOverlay = document.getElementById("termsOverlay");
     if (termsOverlay) {
       termsOverlay.onclick = () => closeTermsModal();
+    }
+
+    function copyLineUrl(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard
+          .writeText(text)
+          .then(() => {
+            alert("リンクをコピーしました。スマートフォンで開いてご利用ください。");
+          })
+          .catch(() => {
+            fallbackCopy(text);
+          });
+      } else {
+        fallbackCopy(text);
+      }
+    }
+
+    function fallbackCopy(text) {
+      const tmp = document.createElement("textarea");
+      tmp.value = text;
+      tmp.style.position = "fixed";
+      tmp.style.left = "-1000px";
+      document.body.appendChild(tmp);
+      tmp.select();
+      try {
+        document.execCommand("copy");
+        alert("リンクをコピーしました。スマートフォンで開いてご利用ください。");
+      } catch (e) {
+        alert("コピーに失敗しました。手動でURLを選択してコピーしてください。");
+      }
+      document.body.removeChild(tmp);
     }
 
     // 初期表示
