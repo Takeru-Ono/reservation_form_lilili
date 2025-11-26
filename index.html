@@ -210,6 +210,7 @@
       font-size: 1.05rem;
       min-height: 48px;
       line-height: 1.4;
+      text-align: center;
     }
     a.button-link:hover {
       opacity: 0.9;
@@ -222,6 +223,10 @@
       text-decoration: underline;
       cursor: pointer;
       color: #c24d16;
+    }
+    .calendar-disabled {
+      pointer-events: none;
+      opacity: 0.5;
     }
 
     /* モバイル向けの調整 */
@@ -490,6 +495,21 @@
       }
       for (const k in slotsCache) {
         delete slotsCache[k];
+      }
+    }
+
+    function setCalendarEnabled(enabled) {
+      const prev = document.getElementById("prevMonthBtn");
+      const next = document.getElementById("nextMonthBtn");
+      const datesDiv = document.getElementById("dates");
+      if (prev) prev.disabled = !enabled;
+      if (next) next.disabled = !enabled;
+      if (datesDiv) {
+        if (enabled) {
+          datesDiv.classList.remove("calendar-disabled");
+        } else {
+          datesDiv.classList.add("calendar-disabled");
+        }
       }
     }
 
@@ -993,6 +1013,7 @@
       }
 
       // Apps Script 側の reserve() を呼び出す
+      setCalendarEnabled(false);
       const formAreaBeforeSubmit = document.getElementById("formArea");
       if (formAreaBeforeSubmit) {
         formAreaBeforeSubmit.innerHTML = `
@@ -1045,6 +1066,7 @@
 
           currentSelectedDate = null;
           selectedSlots = [];
+          setCalendarEnabled(true);
         })
         .withFailureHandler(err => {
           // エラー時はフォームを再表示してメッセージを出す
@@ -1052,6 +1074,7 @@
           const formError = document.getElementById("formGeneralError");
           if (formError) formError.textContent = "送信中にエラーが発生しました。時間をおいてお試しください。";
           alert("エラー: " + err.message);
+          setCalendarEnabled(true);
         })
         .reserve(data);
     }
