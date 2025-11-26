@@ -158,15 +158,18 @@
       font-size: 0.8rem;
       margin-top: 4px;
     }
+    input, textarea, select {
+      font-size: 16px; /* モバイルでの自動拡大防止 */
+    }
     button {
-      padding: 10px 20px;
+      padding: 12px 22px;
       border-radius: 4px;
       border: none;
       background: #f36c21;
       color: #fff;
-      font-size: 1rem;
+      font-size: 1.05rem;
       cursor: pointer;
-      min-height: 44px;
+      min-height: 48px;
     }
     button:hover {
       background: #d95c19;
@@ -197,13 +200,16 @@
     /* LINEボタン用 */
     a.button-link {
       display: inline-block;
-      padding: 10px 18px;
+      padding: 12px 22px;
       border-radius: 6px;
       border: 1px solid #06c755;
       background: #06c755;
       color: #fff;
       text-decoration: none;
       font-weight: bold;
+      font-size: 1.05rem;
+      min-height: 48px;
+      line-height: 1.4;
     }
     a.button-link:hover {
       opacity: 0.9;
@@ -211,6 +217,11 @@
     .hint {
       color: #666;
       font-size: 0.85rem;
+    }
+    .terms-link {
+      text-decoration: underline;
+      cursor: pointer;
+      color: #c24d16;
     }
 
     /* モバイル向けの調整 */
@@ -276,6 +287,100 @@
 
   <div id="formArea"></div>
 
+  <!-- 利用規約モーダル -->
+  <div id="termsOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1000;"></div>
+  <div id="termsModal" style="display:none; position:fixed; inset:0; z-index:1001; display:flex; align-items:center; justify-content:center;">
+    <div style="background:#fff; max-width:640px; width:90%; max-height:80vh; border-radius:8px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,0.2); display:flex; flex-direction:column;">
+      <h3 style="margin-top:0; margin-bottom:8px; font-size:1.1rem;">利用規約</h3>
+      <div id="termsBody" style="flex:1; overflow-y:auto; border:1px solid #e0d5ca; padding:8px; font-size:0.9rem; background:#fffaf5;">
+        <p><strong>学びのかまくら　利用案内・利用規約</strong></p>
+
+        <p><strong>1. 規約の範囲</strong><br>
+        本規約は「学びのかまくら」（以下「当施設」）の利用に関する事項を定めたものです。<br>
+        利用者は本規約に同意の上、お申し込みください。</p>
+
+        <p><strong>2. 利用案内</strong><br>
+        ・学びのかまくらは、子どもたちの居場所となりながら、地域の交流やさまざまな挑戦を応援する場です。サークル活動、地域の集まり、ワークショップ、小さなチャレンジまで幅広くご利用いただけます。<br>
+        ・原則として、営利活動のみを目的とした利用はお受けできません。ただし、以下に該当する活動は例外として利用可能です：<br>
+        ① LiLiLiとの連携企画<br>
+        ② カフェとの協働による取り組み<br>
+        ③ 子ども・若者の挑戦を応援する趣旨を持つ活動（収益の一部が還元される等）<br>
+        内容により判断が必要な場合がありますので、ご不明点は事前にお問い合わせください。<br>
+        ・一部日程はLiLiLiのイベント等で利用できない場合があります。空き状況を事前にご確認ください。</p>
+
+        <p><strong>3. 予約・申込</strong><br>
+        ・空き状況は、HPまたは公式LINEの申込フォームから確認できます。<br>
+        ・予約受付：利用希望月の2ヶ月前からで、毎月末日から受付開始となります。<br>
+        ・仮予約はなく、お申し込みと同時に予約確定となります。<br>
+        ・初めて利用される方は、事前の現地見学をおすすめしています（火曜〜金曜 10:00〜17:00 の間で案内可能）。</p>
+
+        <p><strong>4. 利用枠（時間帯）※土日祝のみ</strong><br>
+        a：9:00〜11:00　b：11:00〜13:00　c：13:30〜14:30　d：14:30〜17:30<br>
+        e：9:00〜13:00（午前まとめ）　f：13:30〜17:30（午後まとめ）<br>
+        準備・片付けも利用時間に含みます。</p>
+
+        <p><strong>5. 利用料金・支払い</strong><br>
+        ・料金は利用枠ごとに設定しています。<br>
+        ・支払い方法：当日、現金を封筒に入れ、指定の場所へお納めください。封筒には以下をご記入ください：<br>
+        　a, 利用者名<br>
+        　b, 利用日時<br>
+        　c, 金額</p>
+
+        <p>【今後のキャッシュレス導入について】<br>
+        ・当施設では、キャッシュレス決済（AirPAY等）の導入を検討しています。導入が決まり次第、支払い方法の追加をご案内いたします。<br>
+        ※現段階では「現金封筒での支払い」が正式な方法です。</p>
+
+        <p>【利用料金の未納が発覚した場合】<br>
+        ・当施設よりご連絡し、原則7日以内にお支払いをお願いします。<br>
+        ・連絡が取れない・支払いが確認できない場合、次回以降の利用をお断りする場合があります。<br>
+        ・継続的な未納がある場合、予約を受けないなどの対応を行う場合があります。</p>
+
+        <p><strong>6. 設備・備品</strong><br>
+        ・使用できる備品は、公式LINEにて一覧を提示します。特別な事前予約は不要です。<br>
+        ・壁面装飾を行う場合は、壁の塗装を傷めない範囲でのマスキングテープ等使用が可能です。強粘着テープ・画鋲・両面テープは使用できません。<br>
+        ・利用時間が終了する前に部屋の写真（片付けの状況）を撮影してください。</p>
+
+        <p><strong>7. キャンセル・日程変更</strong><br>
+        ・キャンセルは利用日の2週間前まで無料です。<br>
+        ・2週間以内のキャンセルは利用料全額を申し受けます。<br>
+        ・日程変更は他の予約状況と照合のうえ対応します。</p>
+
+        <p><strong>8. 損害賠償・免責</strong><br>
+        ・利用者が設備・備品・建物を破損・汚損された場合、当施設が加入する保険で対応できる内容については、保険適用範囲内で対応します。保険適用外の部分や、保険の限度額を超える部分については、利用者に実費をご負担いただきます。<br>
+        ・盗難・トラブル・事故などについて、当施設に重大な過失がない限り責任を負いません。<br>
+        ・天災・停電・事故等の不可抗力で利用が中止となった場合、損害補償は行いません。</p>
+
+        <p><strong>9. 利用の制限</strong><br>
+        以下の場合、利用をお断りする場合があります：<br>
+        ・申込内容が実際と異なる場合<br>
+        ・危険行為・迷惑行為の可能性がある場合<br>
+        ・公序良俗に反する利用<br>
+        ・営利活動のみを目的とした利用<br>
+        ・その他、当施設が不適切と判断した場合</p>
+
+        <p><strong>10. 禁止行為</strong><br>
+        ・火気・危険物の持ち込み<br>
+        ・強い匂いを伴う物品の使用<br>
+        ・ペットの同伴（補助犬を除く）</p>
+
+        <p><strong>11. 反社会的勢力の排除</strong><br>
+        ・利用者は反社会勢力に該当しないことを確約してください。<br>
+        ・該当が判明した場合は利用をお断りします。</p>
+
+        <p><strong>12. 利用終了時の確認</strong><br>
+        ・利用後は、退出前に白いドア（サブ出入口）の施錠を必ずご確認ください。※白いドアはオートロックではありません。<br>
+        ・黒いメインドアは通常通りご利用いただけます。<br>
+        ・最後のコマをご利用の方は電気・エアコンなどの消し忘れがないようご協力ください。</p>
+
+        <p><strong>13. 合意管轄</strong><br>
+        本規約に関する紛争は、当施設所在地を管轄する裁判所を第一審の専属的合意管轄とします。</p>
+      </div>
+      <div style="margin-top:12px; text-align:right;">
+        <button type="button" id="termsCloseBtn">閉じる</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -331,6 +436,17 @@
     // カレント表示月
     let currentMonth = new Date();
     currentMonth.setDate(1);
+
+    // 予約可能な最大月（1日）を計算
+    // 通常は「今月＋1か月先」まで、25日以降は「今月＋2か月先」まで
+    function getMaxAllowedMonth() {
+      const today = new Date();
+      const base = new Date(today.getFullYear(), today.getMonth(), 1);
+      const max = new Date(base);
+      const addMonths = today.getDate() >= 25 ? 2 : 1;
+      max.setMonth(max.getMonth() + addMonths);
+      return max; // 1日
+    }
 
     function formatMonthLabel(date) {
       const y = date.getFullYear();
@@ -747,33 +863,52 @@
 
         <p id="formGeneralError" class="error-text"></p>
 
-        <label>名前: <br><input id="name" style="width: 100%; padding: 6px;"></label>
+        <label>名前: <br><input id="name" style="width: 100%; padding: 8px;"></label>
         <div id="nameError" class="error-text"></div><br>
 
-        <label>メール: <br><input id="email" style="width: 100%; padding: 6px;"></label>
+        <label>メール: <br><input id="email" style="width: 100%; padding: 8px;"></label>
         <div id="emailError" class="error-text"></div><br>
 
         <label>利用目的: <br>
-          <textarea id="purpose" style="width: 100%; padding: 6px;" rows="3" placeholder="例：親子の学習会での利用など"></textarea>
+          <textarea id="purpose" style="width: 100%; padding: 8px;" rows="3" placeholder="例：親子の学習会での利用など"></textarea>
         </label>
         <div id="purposeError" class="error-text"></div><br>
 
         <label>利用人数: <br>
-          <input id="peopleCount" type="number" min="1" style="width: 100%; padding: 6px;" placeholder="例：3">
+          <input id="peopleCount" type="number" min="1" style="width: 100%; padding: 8px;" placeholder="例：3">
         </label>
         <div id="peopleCountError" class="error-text"></div><br>
 
-        <label><input type="checkbox" id="agree"> 利用規約に同意する</label>
+        <label>
+          <input type="checkbox" id="agree">
+          利用規約に同意する（<span id="showTerms" class="terms-link">内容を表示</span>）
+        </label>
         <div id="agreeError" class="error-text"></div><br>
 
         <label>
           <input type="checkbox" id="lineRegistered">
           公式LINEアカウントを登録しました／これから登録します
+          <span class="hint">
+            （<a href="#" id="officialLineLink" target="_blank" rel="noopener noreferrer">公式LINEはこちら</a>）
+          </span>
         </label>
         <div id="lineRegisteredError" class="error-text"></div><br>
 
+        <p class="hint">
+          ※ご利用日の2週間前以降のキャンセルはできません（キャンセル料100%）。
+        </p>
+
         <button onclick="reserve()">予約を送信する</button>
       `;
+
+      const termsLink = document.getElementById("showTerms");
+      if (termsLink) {
+        termsLink.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openTermsModal();
+        };
+      }
     }
 
     // 予約実行
@@ -889,12 +1024,17 @@
               token;
             const url = lineLinkBaseUrl + encodeURIComponent(presetMessage);
             formArea.innerHTML = `
-              <h3>予約の送信をしました</h3>
-              <p>ご入力いただいた内容をもとに予約を登録しました。</p>
-              <p>公式LINEで鍵番号と当日のご案内をお送りします。下のボタンから鍵受け取りステップに進んでください。</p>
+              <h3>ご予約ありがとうございました！</h3>
+              <p>
+                鍵番号や当日のご案内は、公式LINEでお送りします。<br>
+                下のボタンを押すと、LINEのトーク画面に予約番号がセットされますので、<br>
+                <strong>そのまま送信してください。</strong>
+              </p>
               <p><a class="button-link" href="${url}" target="_blank" rel="noopener noreferrer">LINEで鍵を受け取る</a></p>
-              <p class="hint">※スマートフォンで開いている場合、LINEアプリが起動することがあります。</p>
-              <button onclick="resetReservation()">元の画面に戻る</button>
+              <p class="hint">
+                ※ご本人のスマートフォンから操作してください。<br>
+                ※リンクを他の方に転送しないようご注意ください。
+              </p>
             `;
           }
           clearCaches();
@@ -931,11 +1071,41 @@
     };
 
     document.getElementById("nextMonthBtn").onclick = () => {
-      currentMonth.setMonth(currentMonth.getMonth() + 1);
+      const next = new Date(currentMonth);
+      next.setMonth(next.getMonth() + 1);
+      const maxMonth = getMaxAllowedMonth();
+      if (next.getTime() > maxMonth.getTime()) {
+        // これ以上先の月は表示しない
+        return;
+      }
+      currentMonth = next;
       loadCurrentMonth();
       document.getElementById("slots").innerHTML = "";
       document.getElementById("formArea").innerHTML = "";
     };
+
+    function openTermsModal() {
+      const overlay = document.getElementById("termsOverlay");
+      const modal = document.getElementById("termsModal");
+      if (overlay) overlay.style.display = "block";
+      if (modal) modal.style.display = "flex";
+    }
+
+    function closeTermsModal() {
+      const overlay = document.getElementById("termsOverlay");
+      const modal = document.getElementById("termsModal");
+      if (overlay) overlay.style.display = "none";
+      if (modal) modal.style.display = "none";
+    }
+
+    const termsCloseBtn = document.getElementById("termsCloseBtn");
+    if (termsCloseBtn) {
+      termsCloseBtn.onclick = () => closeTermsModal();
+    }
+    const termsOverlay = document.getElementById("termsOverlay");
+    if (termsOverlay) {
+      termsOverlay.onclick = () => closeTermsModal();
+    }
 
     // 初期表示
     loadCurrentMonth();
