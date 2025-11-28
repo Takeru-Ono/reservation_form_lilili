@@ -228,6 +228,10 @@
       pointer-events: none;
       opacity: 0.5;
     }
+    .app-busy .slot-item {
+      pointer-events: none;
+      opacity: 0.5;
+    }
 
     /* モバイル向けの調整 */
     @media (max-width: 600px) {
@@ -271,6 +275,16 @@
       a.button-link {
         width: 100%;
         text-align: center;
+      }
+    }
+
+    /* さらに狭い画面向けの調整（2列表示） */
+    @media (max-width: 420px) {
+      #dates {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .date-item {
+        padding: 10px 8px;
       }
     }
   </style>
@@ -632,6 +646,7 @@
       const cached = slotsCache[date];
       if (cached) {
         renderSlotsForDate(date, weekdayLabel, cached);
+        scrollToId("slots");
         return;
       }
 
@@ -640,6 +655,7 @@
         .withSuccessHandler(slots => {
           slotsCache[date] = slots; // キャッシュ保存
           renderSlotsForDate(date, weekdayLabel, slots);
+          scrollToId("slots");
         })
         .getSlots(date);
     }
@@ -933,6 +949,9 @@
       };
       attachTermsHandler(termsLink);
       attachTermsHandler(termsText);
+
+      // フォームまで自動スクロール（モバイルでの操作性向上）
+      scrollToId("formArea");
     }
 
     // 予約実行
@@ -1013,6 +1032,7 @@
       }
 
       // Apps Script 側の reserve() を呼び出す
+      document.body.classList.add("app-busy");
       setCalendarEnabled(false);
       const formAreaBeforeSubmit = document.getElementById("formArea");
       if (formAreaBeforeSubmit) {
@@ -1044,18 +1064,18 @@
           } else {
             const presetMessage =
               "【学びのかまくら】レンタルスペース\n" +
-              "鍵番号や当日のご案内をLINEでお届けするための予約番号です。\n" +
+              "当日のご案内をLINEでお届けするための予約番号です。\n" +
               "このまま送信してください。\n\n" +
               token;
             const url = lineLinkBaseUrl + encodeURIComponent(presetMessage);
             formArea.innerHTML = `
               <h3>ご予約ありがとうございました！</h3>
               <p>
-                鍵番号や当日のご案内は、公式LINEでお送りします。<br>
+                当日のご案内は、公式LINEでお送りします。<br>
                 スマートフォンでご覧の場合は、下のボタンを押すとLINEのトーク画面に予約番号がセットされますので、<br>
                 <strong>そのまま送信してください。</strong>
               </p>
-              <p><a class="button-link" href="${url}" target="_blank" rel="noopener noreferrer">LINEで鍵を受け取る</a></p>
+              <p><a class="button-link" href="${url}" target="_blank" rel="noopener noreferrer">LINEで案内を受け取る</a></p>
               <p class="hint">
                 ※PCでご覧の場合は、下のボックス内のURLをコピーして、ご自身のスマートフォンに送信し、スマホのブラウザやLINEから開いてください。<br>
                 ※リンクを他の方に転送しないようご注意ください。
@@ -1080,6 +1100,7 @@
           currentSelectedDate = null;
           selectedSlots = [];
           setCalendarEnabled(true);
+          document.body.classList.remove("app-busy");
         })
         .withFailureHandler(err => {
           // エラー時はフォームを再表示してメッセージを出す
@@ -1088,6 +1109,7 @@
           if (formError) formError.textContent = "送信中にエラーが発生しました。時間をおいてお試しください。";
           alert("エラー: " + err.message);
           setCalendarEnabled(true);
+          document.body.classList.remove("app-busy");
         })
         .reserve(data);
     }
@@ -1148,6 +1170,12 @@
     const termsOverlay = document.getElementById("termsOverlay");
     if (termsOverlay) {
       termsOverlay.onclick = () => closeTermsModal();
+    }
+
+    function scrollToId(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     function copyLineUrl(text) {

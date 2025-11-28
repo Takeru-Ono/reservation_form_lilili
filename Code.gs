@@ -15,7 +15,7 @@ const CONFIG = {
   TIMEZONE: "Asia/Tokyo",
   HOLIDAY_CALENDAR_ID: "ja.japanese#holiday@group.v.calendar.google.com",
 
-  KEY_CODE: PROPS.getProperty("KEY_CODE"), // 固定鍵番号
+  KEY_CODE: PROPS.getProperty("KEY_CODE"), // 固定コード（内部用）
   LINE_ACCESS_TOKEN: PROPS.getProperty("LINE_ACCESS_TOKEN"),
   LINE_BASIC_ID: PROPS.getProperty("LINE_BASIC_ID"),
 };
@@ -217,7 +217,7 @@ function reserve(data) {
     throw new Error("公式LINEアカウント登録のチェックが必要です");
   }
 
-  // 🔑 トークン & 鍵番号生成
+  // 🔑 トークン & 固定コード生成
   const token = generateToken_();
   const keyCode = CONFIG.KEY_CODE;
 
@@ -233,7 +233,7 @@ function reserve(data) {
     cal.createEvent(`予約: ${data.name}`, s.start, s.end, {
       description: `名前: ${data.name}
 メール: ${data.email}
-鍵番号: ${keyCode}
+内部コード: ${keyCode}
 トークン: ${token}`,
       guests: data.email, // カンマ区切り文字列で指定
       sendInvites: true,
@@ -253,13 +253,13 @@ function reserve(data) {
         data.email,
         data.agree,
         token, // 予約トークン
-        keyCode, // 鍵番号
+        keyCode, // 内部コード
         "", // line_user_id（LINEユーザーID）
         purpose, // 利用目的
         peopleCount, // 利用人数
         "", // link_status
         "", // link_updated_at
-        "", // key_sent_at（暗証番号送信日時）
+        "", // key_sent_at（案内送信日時）
       ]);
     });
   }
@@ -587,7 +587,7 @@ function linkTokenAndSendKey_(userId, token) {
       "この予約番号は、あなたのLINEアカウントがご予約者様と認識しております。\n\n" +
       header +
       "\n\n" +
-      "暗証番号はご利用日前日10時に、このトークにお送りします。";
+      "ご利用日前日10時に、このトークに当日のご案内をお送りします。";
   } else {
     // 初回または pending 状態の場合は確認メッセージを送る
     message =
@@ -596,7 +596,7 @@ function linkTokenAndSendKey_(userId, token) {
       "\n\n" +
       "この予約されたのは、こちらのLINEアカウント本人で間違いないでしょうか？\n" +
       "内容に問題がなければ、「はい」と返信してください。\n" +
-      "（※暗証番号はご利用日前日10時にお送りします）";
+      "（※ご利用日前日10時に、このトークに当日のご案内をお送りします）";
   }
 
   sendLineMessage_(userId, message);
@@ -648,12 +648,12 @@ function confirmLinkForUser_(userId) {
   sendLineMessage_(
     userId,
     "ご予約ありがとうございます。\n\n" +
-      "このLINEに鍵番号と当日のご案内をお送りします。\n" +
-      "※暗証番号の送信はご利用日前日10時を予定しています。"
+      "このLINEに当日のご案内をお送りします。\n" +
+      "※ご利用日前日10時ごろにお送りする予定です。"
   );
 }
 
-// 予約日の前日の朝10時に暗証番号を送信する想定の処理
+// 予約日の前日の朝10時に当日のご案内を送信する想定の処理
 // （時間主導型トリガーで毎日10:00ごろに実行する）
 function sendKeysForTomorrow() {
   if (!CONFIG.SHEET_ID) {
@@ -748,7 +748,7 @@ function sendKeysForTomorrow() {
     const endStr = Utilities.formatDate(maxEnd, CONFIG.TIMEZONE, "HH:mm");
 
     const message =
-      "明日のご利用ありがとうございます。暗証番号をお送りします。\n\n" +
+      "明日のご利用ありがとうございます。\n\n" +
       "【予約内容】\n" +
       `日付：${dateStr}\n` +
       `時間：${startStr} - ${endStr}\n` +
@@ -756,8 +756,9 @@ function sendKeysForTomorrow() {
       (peopleCount ? `利用人数：${peopleCount}人\n` : "") +
       (purpose ? `利用目的：${purpose}\n` : "") +
       "\n" +
-      "【暗証番号】\n" +
-      `${keyCode}\n\n` +
+      "【当日のご案内】\n" +
+      "・ご利用内容の確認と入退室の流れについて、事前にこのメッセージを保管しておいてください。\n\n" +
+      "※ご利用日の2週間前以降のキャンセルはできません（キャンセル料100%）。\n" +
       "何かございましたら公式LINEにご連絡ください。\n" +
       "ご利用後は、このトークに片付け後の写真を送信してください。";
 

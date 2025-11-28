@@ -5,7 +5,7 @@
 本ドキュメントは、「学びのかまくら」レンタルスペースのために構築した **予約＋LINE連携システム** の実装仕様をまとめたものです。  
 ユーザーは Web 予約フォームから「日付 → 時間帯 → 利用目的・人数など」を入力して予約します。  
 予約が完了すると Google カレンダーに予定が登録され、さらに公式LINEで予約番号を送ることで、LINEアカウントと予約を紐づけます。  
-利用日前日の 10:00 に、自動的に暗証番号を LINE へ送信します。
+利用日前日の 10:00 に、自動的に当日のご案内を LINE へ送信します。
 
 ---
 
@@ -23,7 +23,7 @@
 | F-06 | ログ保存                      | 予約情報を Google スプレッドシート `log` シートに行単位で記録する                    |
 | F-07 | LINE 予約番号送信リンク       | 予約完了画面から、予約トークン付きの LINE メッセージ作成リンクを表示する             |
 | F-08 | LINE と予約の紐づけ           | ユーザーが token をLINEに送信し、内容確認後「はい」と返信することで紐づけを確定     |
-| F-09 | 暗証番号自動送信（前日10時）  | 利用日前日の 10:00 に、暗証番号と当日の案内を LINE へ自動送信する                   |
+| F-09 | 前日案内の自動送信（前日10時）  | 利用日前日の 10:00 に、当日の案内を LINE へ自動送信する                             |
 | F-10 | 月末の予約解放制御            | 月末（25日以降）は「今月＋2か月先」まで、通常は「今月＋1か月先」まで予約可能に制御   |
 
 ### 2.2 非機能要件
@@ -55,7 +55,7 @@ flowchart TD
 - 外部サービス：
   - Google Calendar（予約用カレンダー）
   - Google Spreadsheet（予約ログ）
-  - LINE Messaging API（予約番号送信・暗証番号送信）
+  - LINE Messaging API（予約番号送信・前日案内送信）
 
 ---
 
@@ -77,7 +77,7 @@ flowchart LR
   E[予約番号付きメッセージ<br>（token=R-...）] --> F[Code.gs doPost / handleLineEvent_]
   F --> G[予約内容の確認メッセージを返信<br>「内容に問題なければ『はい』と返信」]
   H[ユーザーが「はい」と返信] --> I[confirmLinkForUser_ で<br>link_status=confirmed に更新]
-  I --> J[利用日前日10時の sendKeysForTomorrow で<br>暗証番号を送信]
+  I --> J[利用日前日10時の sendKeysForTomorrow で<br>当日の案内を送信]
 ```
 
 ---
@@ -135,12 +135,12 @@ flowchart LR
 2. Google カレンダーの取得と、重複予約チェック：
    - `slots` を `Date` に変換し、各スロットに対して `cal.getEvents(s.start, s.end)` を実行。
    - 既存イベントがあればエラー `"すでに予約が埋まりました"` を投げる。
-3. 予約トークン・鍵番号生成：
+3. 予約トークン・固定コードの生成：
    - `generateToken_()` で `R-YYYYMMDD-ランダム英数字` の形の token を生成。
-   - `CONFIG.KEY_CODE` から固定鍵番号を取得。
+   - `CONFIG.KEY_CODE` に内部用の固定コードを保持（現状ユーザーには送信しない）。
 4. カレンダー登録：
    - 各スロットに対して `cal.createEvent("予約: 名前", start, end, options)` を呼び出し。
-   - `description` には `名前 / メール / 鍵番号 / トークン` を記録。
+   - `description` には `名前 / メール / 内部コード / トークン` を記録。
    - `guests` にメールアドレス、`sendInvites: true` で招待メール送信。
 5. ログ書き込み（Spreadsheet `log` シート）：
    - `CONFIG.SHEET_ID` が設定されている場合のみ書き込み。
@@ -155,7 +155,7 @@ flowchart LR
      | 5  | email        | メールアドレス                        |
      | 6  | agree        | 利用規約同意フラグ（true/false）      |
      | 7  | token        | 予約トークン                          |
-     | 8  | keyCode      | 鍵番号                                |
+     | 8  | keyCode      | 内部コード                            |
      | 9  | line_user_id | LINE ユーザーID（紐づけ後にセット）   |
      | 10 | purpose      | 利用目的（フォーム入力）              |
      | 11 | people_count | 利用人数（フォーム入力）              |
@@ -202,7 +202,7 @@ flowchart LR
 7. 返信メッセージ：
    - すでに confirmed の場合：
      - 「あなたのLINEアカウントがご予約者様と認識しています」としたうえで予約内容を表示し、  
-       暗証番号は前日10時に送る旨を案内。
+       前日10時に当日の案内を送る旨を案内。
    - pending（または初回）の場合：
      - 「この予約をこちらのLINEアカウント本人で間違いないか」確認し、  
        問題なければ「はい」と返信するよう促す。
@@ -216,7 +216,7 @@ flowchart LR
    - `link_updated_at = now`
 4. 「ご予約ありがとうございます。このLINEに鍵番号と当日のご案内をお送りします。暗証番号はご利用日前日10時を予定しています。」と返信。
 
-### 5.7 暗証番号送信（前日10時）`sendKeysForTomorrow()`
+### 5.7 前日案内送信（前日10時）`sendKeysForTomorrow()`
 
 1. 時間主導型トリガーで毎日 10:00 ごろに実行する想定。
 2. `log` シート全行をチェックし、以下の条件を満たす行を対象にする：
@@ -228,7 +228,7 @@ flowchart LR
    - 最小 `start`〜最大 `end` を予約時間帯として表示。
 4. 代表情報（name, purpose, people_count, keyCode）を用いてメッセージ送信：
    - 予約内容（日時／名前／人数／目的）
-   - 暗証番号
+   - 当日の案内（テキスト）
    - 「2週間前以降キャンセル不可」の注意書き
    - 何かあれば公式LINEへ連絡、利用後は片付け写真送信のお願い
 5. 送信した行には `key_sent_at = 新しい Date()` を記録。
@@ -328,7 +328,7 @@ flowchart LR
 | `handleLineEvent_(event)`      | LINEメッセージ種別（token/はい）判定   | なし                         | なし                                             |
 | `linkTokenAndSendKey_(userId, token)` | token と LINE userId を紐づけ、予約内容確認メッセージ送信 | Spreadsheet `log`, LINE | 該当行の 9,12,13列を更新（line_user_id, link_status, link_updated_at） |
 | `confirmLinkForUser_(userId)`  | `"はい"` 返信時に紐づけを confirmed に | Spreadsheet `log`, LINE      | 該当行の 12,13列を更新                           |
-| `sendKeysForTomorrow()`        | 前日10時に暗証番号＋案内を送信         | Spreadsheet `log`, LINE      | 該当行の 14列（key_sent_at）を更新              |
+| `sendKeysForTomorrow()`        | 前日10時に当日の案内を送信             | Spreadsheet `log`, LINE      | 該当行の 14列（key_sent_at）を更新              |
 | `sendLineMessage_(userId,text)`| LINE push メッセージ送信               | LINE Messaging API           | なし                                             |
 | `pushTest()`                   | 手動テスト用の固定メッセージ送信       | LINE Messaging API           | なし                                             |
 
@@ -365,7 +365,7 @@ flowchart LR
 2. スクリプト プロパティに以下を設定：
    - `CALENDAR_ID`：予約用 Google カレンダーID
    - `SHEET_ID`：ログ用 Spreadsheet のID
-   - `KEY_CODE`：暗証番号（固定値）
+   - `KEY_CODE`：内部コード用（固定値）
    - `LINE_ACCESS_TOKEN`：LINE Messaging API のチャネルアクセストークン
    - `LINE_BASIC_ID`：公式LINEのBASIC ID（`@xxxx`）
 3. `getAvailability()` などを一度実行して権限を付与。
@@ -375,7 +375,7 @@ flowchart LR
 5. LINE 側の設定：
    - Messaging API の Webhook URL に、`doPost` を公開している Web アプリ URL を設定。
    - 応答メッセージなどは、必要に応じて LINE 側で OFF/ON を調整。
-6. 暗証番号送信用トリガー：
+6. 前日案内送信用トリガー：
    - 「トリガー」から `sendKeysForTomorrow` を毎日 10:00 実行に設定。
 
 ---
@@ -412,7 +412,7 @@ flowchart LR
 ## 12. 拡張案（Optional）
 
 - 予約キャンセルフォームと、自動キャンセル処理（2週間前まで無料）。
-- メール通知（予約完了、暗証番号通知のバックアップ）。
+- メール通知（予約完了、前日案内通知のバックアップ）。
 - 管理者向けダッシュボード（空き状況、売上集計など）。
 - 料金体系のバリエーション（平日利用、特別料金日など）。
 - reCAPTCHA や rate-limit によるスパム対策。
