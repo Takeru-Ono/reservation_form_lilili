@@ -457,7 +457,8 @@
     currentMonth.setDate(1);
 
     // 予約可能な最大月（1日）を計算
-    // 通常は「今月＋1か月先」まで、25日以降は「今月＋2か月先」まで
+    // 通常は「今月＋1か月先」まで
+    // 各月25日以降は「今月＋2か月先」まで（例: 11月25日以降なら1月まで、12月25日以降なら2月まで）
     function getMaxAllowedMonth() {
       const today = new Date();
       const base = new Date(today.getFullYear(), today.getMonth(), 1);
