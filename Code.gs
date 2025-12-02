@@ -18,18 +18,20 @@ const CONFIG = {
   KEY_CODE: PROPS.getProperty("KEY_CODE"),
   LINE_ACCESS_TOKEN: PROPS.getProperty("LINE_ACCESS_TOKEN"),
   LINE_BASIC_ID: PROPS.getProperty("LINE_BASIC_ID"),
+  // MODE: "prod",
 };
 
 // テスト用設定（必要に応じて CONFIG と差し替えて利用）
-const CONFIG_TEST = {
-  CALENDAR_ID: PROPS.getProperty("CALENDAR_ID_TEST"),
-  SHEET_ID: PROPS.getProperty("SHEET_ID_TEST"),
-  TIMEZONE: "Asia/Tokyo",
-  HOLIDAY_CALENDAR_ID: "ja.japanese#holiday@group.v.calendar.google.com",
-  KEY_CODE: PROPS.getProperty("KEY_CODE_TEST"),
-  LINE_ACCESS_TOKEN: PROPS.getProperty("LINE_ACCESS_TOKEN_TEST"),
-  LINE_BASIC_ID: PROPS.getProperty("LINE_BASIC_ID_TEST"),
-};
+// const CONFIG_TEST = {
+//   CALENDAR_ID: PROPS.getProperty("CALENDAR_ID_TEST"),
+//   SHEET_ID: PROPS.getProperty("SHEET_ID_TEST"),
+//   TIMEZONE: "Asia/Tokyo",
+//   HOLIDAY_CALENDAR_ID: "ja.japanese#holiday@group.v.calendar.google.com",
+//   KEY_CODE: PROPS.getProperty("KEY_CODE_TEST"),
+//   LINE_ACCESS_TOKEN: PROPS.getProperty("LINE_ACCESS_TOKEN_TEST"),
+//   LINE_BASIC_ID: PROPS.getProperty("LINE_BASIC_ID_TEST"),
+//   MODE: "test",
+// };
 
 // 時間帯パターン（フロントの index.html と同じ構成）
 // 1コマ（2時間）3000円
@@ -825,4 +827,19 @@ function pushTest() {
       ],
     }),
   });
+}
+
+function debugCalendar() {
+  Logger.log("CONFIG.CALENDAR_ID = " + CONFIG.CALENDAR_ID);
+  const cal = CalendarApp.getCalendarById(CONFIG.CALENDAR_ID);
+  Logger.log("cal = " + cal);
+}
+
+function debugListCalendars() {
+  Logger.log("===== debugListCalendars() =====");
+  const cals = CalendarApp.getAllCalendars();
+  cals.forEach((cal, i) => {
+    Logger.log(i + 1 + ": " + cal.getName() + " / ID = " + cal.getId());
+  });
+  Logger.log("===== end of list =====");
 }

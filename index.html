@@ -455,6 +455,7 @@
     // カレント表示月
     let currentMonth = new Date();
     currentMonth.setDate(1);
+    currentMonth.setHours(0, 0, 0, 0);
 
     // 予約可能な最大月（1日）を計算
     // 通常は「今月＋1か月先」まで
@@ -1128,6 +1129,7 @@
     // イベント初期化
     document.getElementById("prevMonthBtn").onclick = () => {
       currentMonth.setMonth(currentMonth.getMonth() - 1);
+      currentMonth.setHours(0, 0, 0, 0);
       loadCurrentMonth();
       document.getElementById("slots").innerHTML = "";
       document.getElementById("formArea").innerHTML = "";
@@ -1136,6 +1138,7 @@
     document.getElementById("nextMonthBtn").onclick = () => {
       const next = new Date(currentMonth);
       next.setMonth(next.getMonth() + 1);
+      next.setHours(0, 0, 0, 0);
       const maxMonth = getMaxAllowedMonth();
       if (next.getTime() > maxMonth.getTime()) {
         // これ以上先の月は表示しない
