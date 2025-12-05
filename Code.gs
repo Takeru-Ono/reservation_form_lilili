@@ -565,6 +565,18 @@ function linkTokenAndSendKey_(userId, token) {
   const startTimes = rowsForToken.map((info) => new Date(info.row[1]));
   const endTimes = rowsForToken.map((info) => new Date(info.row[2]));
 
+  startTimes.forEach((d, idx) => {
+    Logger.log(
+      `[sendKeys] token=${token} row${idx} ` +
+        "raw: " +
+        d.toString() +
+        " / ISO: " +
+        d.toISOString() +
+        " / JST: " +
+        Utilities.formatDate(d, CONFIG.TIMEZONE, "yyyy/MM/dd HH:mm")
+    );
+  });
+
   // まとめて表示用に最小開始・最大終了を計算
   let minStart = startTimes[0];
   let maxEnd = endTimes[0];
@@ -582,6 +594,19 @@ function linkTokenAndSendKey_(userId, token) {
   );
   const startStr = Utilities.formatDate(minStart, CONFIG.TIMEZONE, "HH:mm");
   const endStr = Utilities.formatDate(maxEnd, CONFIG.TIMEZONE, "HH:mm");
+
+  Logger.log(
+    `[sendKeys] token=${token} minStart JST: ` +
+      Utilities.formatDate(minStart, CONFIG.TIMEZONE, "yyyy/MM/dd HH:mm") +
+      " / ISO: " +
+      minStart.toISOString()
+  );
+  Logger.log(
+    `[sendKeys] token=${token} maxEnd JST: ` +
+      Utilities.formatDate(maxEnd, CONFIG.TIMEZONE, "yyyy/MM/dd HH:mm") +
+      " / ISO: " +
+      maxEnd.toISOString()
+  );
 
   const header =
     "【予約内容】\n" +
@@ -609,7 +634,7 @@ function linkTokenAndSendKey_(userId, token) {
       "\n\n" +
       "この予約されたのは、こちらのLINEアカウント本人で間違いないでしょうか？\n" +
       "内容に問題がなければ、「はい」と返信してください。\n" +
-      "（※ご利用日前日10時に、このトークに当日のご案内をお送りします）";
+      "（※ご利用日前日10時までに、このトークに当日のご案内をお送りします）";
   }
 
   sendLineMessage_(userId, message);
@@ -662,7 +687,7 @@ function confirmLinkForUser_(userId) {
     userId,
     "ご予約ありがとうございます。\n\n" +
       "このLINEに当日のご案内をお送りします。\n" +
-      "※ご利用日前日10時ごろにお送りする予定です。"
+      "※ご利用日前日10時までにお送りする予定です。"
   );
 }
 
@@ -842,4 +867,45 @@ function debugListCalendars() {
     Logger.log(i + 1 + ": " + cal.getName() + " / ID = " + cal.getId());
   });
   Logger.log("===== end of list =====");
+}
+
+function debugLogRowByToken(token) {
+  if (!CONFIG.SHEET_ID) {
+    Logger.log("SHEET_ID が設定されていません");
+    return;
+  }
+
+  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const sheet = ss.getSheetByName("log") || ss.insertSheet("log");
+  const values = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const rowToken = row[6];
+    if (rowToken === token) {
+      const start = row[1];
+      const end = row[2];
+      Logger.log("=== debugLogRowByToken ===");
+      Logger.log("row index: " + (i + 1));
+      Logger.log("start raw: " + start);
+      if (start instanceof Date) {
+        Logger.log("start ISO: " + start.toISOString());
+        Logger.log(
+          "start JST: " +
+            Utilities.formatDate(start, CONFIG.TIMEZONE, "yyyy/MM/dd HH:mm")
+        );
+      }
+      Logger.log("end raw: " + end);
+      if (end instanceof Date) {
+        Logger.log("end ISO: " + end.toISOString());
+        Logger.log(
+          "end JST: " +
+            Utilities.formatDate(end, CONFIG.TIMEZONE, "yyyy/MM/dd HH:mm")
+        );
+      }
+      Logger.log("==========================");
+      return;
+    }
+  }
+  Logger.log("token " + token + " の行が見つかりませんでした");
 }

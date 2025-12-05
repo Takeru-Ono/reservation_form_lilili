@@ -366,7 +366,7 @@
 
         <p><strong>8. 損害賠償・免責</strong><br>
         ・利用者が設備・備品・建物を破損・汚損された場合、当施設が加入する保険で対応できる内容については、保険適用範囲内で対応します。保険適用外の部分や、保険の限度額を超える部分については、利用者に実費をご負担いただきます。<br>
-        ・盗難・トラブル・事故などについて、当施設に重大な過失がない限り責任を負いません。<br>
+        ・盗難・トラブル・事故などについて、責任を負いません。<br>
         ・天災・停電・事故等の不可抗力で利用が中止となった場合、損害補償は行いません。</p>
 
         <p><strong>9. 利用の制限</strong><br>
@@ -387,9 +387,8 @@
         ・該当が判明した場合は利用をお断りします。</p>
 
         <p><strong>12. 利用終了時の確認</strong><br>
-        ・利用後は、退出前に白いドア（サブ出入口）の施錠を必ずご確認ください。※白いドアはオートロックではありません。<br>
-        ・黒いメインドアは通常通りご利用いただけます。<br>
-        ・最後のコマをご利用の方は電気・エアコンなどの消し忘れがないようご協力ください。</p>
+        ・利用後は、退出前に白いドア（サブ出入口）の施錠を必ずご確認ください。<br>
+        ・電気・エアコンなどの消し忘れがないようご協力ください。</p>
 
         <p><strong>13. 合意管轄</strong><br>
         本規約に関する紛争は、当施設所在地を管轄する裁判所を第一審の専属的合意管轄とします。</p>
@@ -407,7 +406,7 @@
     // 例: const lineLinkBaseUrl = 'https://script.google.com/macros/s/xxxx/exec?page=line';
     // const lineLinkBaseUrl = 'https://script.google.com/macros/s/AKfycbynV77umUU0jXEX2UVb2qTYsYIjYVENVex-FhQkqVPHXC4Y_m0mer3muUbb2_7h1Aiu/exec';
     // 🔗 LINEのBASIC ID（@から始まるやつ）
-    const LINE_BASIC_ID = "@095zhejy"; // 例: "@kamakura_space"
+    const LINE_BASIC_ID = "@824kiege"; // 例: "@kamakura_space"
 
     // 🔗 LINE連携用ベースURL（oaMessage のURLスキーム）
     const lineLinkBaseUrl =
@@ -451,6 +450,16 @@
       const key = `${first.startTime}-${last.endTime}`; // "HH:MM-HH:MM"
       OFFER_BY_RANGE[key] = o;
     });
+
+    function openOfficialLine() {
+      // 公式LINEの友だち追加URL
+      const url = "https://lin.ee/606k43V";
+      // iPhone / GAS 埋め込みでも抜けやすいように _blank で開く
+      window.open(url, "_blank");
+      // もしこれでもダメなら "_top" に変えてみてOK
+      // window.open(url, "_top");
+    }
+
 
     // カレント表示月
     let currentMonth = new Date();
@@ -927,7 +936,9 @@
           <input type="checkbox" id="lineRegistered">
           公式LINEアカウントを登録しました／これから登録します
           <span class="hint">
-            （<a href="#" id="officialLineLink" target="_blank" rel="noopener noreferrer">公式LINEはこちら</a>）
+            （<a href="#"
+                id="officialLineLink"
+                onclick="openOfficialLine(); return false;">公式LINEはこちら</a>）
           </span>
         </label>
         <div id="lineRegisteredError" class="error-text"></div><br>
