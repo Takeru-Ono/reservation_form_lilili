@@ -104,16 +104,6 @@ function getAvailability(year, month) {
   rangeEnd.setHours(23, 59, 59, 999);
 
   const monthlyEvents = cal.getEvents(firstDay, rangeEnd);
-  const eventsByDate = {};
-  monthlyEvents.forEach((ev) => {
-    const start = ev.getStartTime();
-    const key = formatDate_(start);
-    if (!eventsByDate[key]) {
-      eventsByDate[key] = [];
-    }
-    eventsByDate[key].push(ev);
-  });
-
   // 祝日も月単位で取得
   const holidayMap = {};
   if (holidayCal) {
@@ -137,8 +127,14 @@ function getAvailability(year, month) {
     // 「営業日」かどうか判定（土日 or 祝日を営業日とみなしている）
     if (!isBusinessDay_(d, isHol)) continue;
 
-    // その日のイベント一覧（事前にまとめて取得したものから取り出す）
-    const eventsForDay = eventsByDate[dateKey] || [];
+    // その日のイベント一覧
+    const eventsForDay = monthlyEvents.filter((ev) =>
+      isEventOnDate_(ev, d)
+    );
+
+    // 終日イベントがある日は表示しない
+    const hasAllDayEvent = eventsForDay.some((ev) => ev.isAllDayEvent());
+    if (hasAllDayEvent) continue;
 
     // 1日分の枠のうち空きがいくつあるか
     const { freeCount, totalCount } = countFreeSlotsForDateFromEvents_(
@@ -307,6 +303,16 @@ function formatDate_(d) {
   const m = ("0" + (d.getMonth() + 1)).slice(-2);
   const dd = ("0" + d.getDate()).slice(-2);
   return `${y}-${m}-${dd}`;
+}
+
+// イベントが指定日（0:00〜翌0:00）にかかっているか判定
+function isEventOnDate_(ev, d) {
+  const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+  const nextDay = new Date(dayStart);
+  nextDay.setDate(nextDay.getDate() + 1);
+  const evStart = ev.getStartTime();
+  const evEnd = ev.getEndTime();
+  return evStart < nextDay && evEnd > dayStart;
 }
 
 function parseDate_(str) {

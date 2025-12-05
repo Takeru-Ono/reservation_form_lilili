@@ -199,7 +199,9 @@
 
     /* LINEボタン用 */
     a.button-link {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       padding: 12px 22px;
       border-radius: 6px;
       border: 1px solid #06c755;
@@ -215,6 +217,12 @@
     a.button-link:hover {
       opacity: 0.9;
     }
+    .line-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+    .line-copy-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .line-copy-row input { flex: 1 1 220px; }
+    .line-copy-row button { flex: 0 0 auto; }
+    .line-qr { text-align: center; }
+    .line-qr img { width: 220px; height: 220px; object-fit: contain; }
     .hint {
       color: #666;
       font-size: 0.85rem;
@@ -1081,32 +1089,7 @@
               "このまま送信してください。\n\n" +
               token;
             const url = lineLinkBaseUrl + encodeURIComponent(presetMessage);
-            formArea.innerHTML = `
-              <h3>ご予約ありがとうございました！</h3>
-              <p>
-                当日のご案内は、公式LINEでお送りします。<br>
-                スマートフォンでご覧の場合は、下のボタンを押すとLINEのトーク画面に予約番号がセットされますので、<br>
-                <strong>そのまま送信してください。</strong>
-              </p>
-              <p><a class="button-link" href="${url}" target="_blank" rel="noopener noreferrer">LINEで案内を受け取る</a></p>
-              <p class="hint">
-                ※PCでご覧の場合は、下のボックス内のURLをコピーして、ご自身のスマートフォンに送信し、スマホのブラウザやLINEから開いてください。<br>
-                ※リンクを他の方に転送しないようご注意ください。
-              </p>
-              <div>
-                <input id="lineLinkRaw" type="text" style="width:100%; padding:6px; font-size:0.8rem;" readonly value="${url}">
-                <button type="button" id="copyLineLinkBtn" style="margin-top:6px;">リンクをコピーする</button>
-              </div>
-            `;
-            const copyBtn = document.getElementById("copyLineLinkBtn");
-            if (copyBtn) {
-              copyBtn.onclick = () => {
-                const input = document.getElementById("lineLinkRaw");
-                if (!input) return;
-                const text = input.value;
-                copyLineUrl(text);
-              };
-            }
+            renderLineCompletion(formArea, url);
           }
           clearCaches();
 
@@ -1125,6 +1108,61 @@
           document.body.classList.remove("app-busy");
         })
         .reserve(data);
+    }
+
+    function renderLineCompletion(formArea, url) {
+      formArea.innerHTML = `
+        <h3>ご予約ありがとうございました！</h3>
+        <p>
+          当日のご案内は、公式LINEでお送りします。<br>
+          スマートフォンでご覧の場合は、下のボタンを押すとLINEのトーク画面に予約番号がセットされますので、<br>
+          <strong>そのまま送信してください。</strong>
+        </p>
+        <div class="line-actions">
+          <a class="button-link" href="${url}" target="_blank" rel="noopener noreferrer">LINEで案内を受け取る</a>
+          <div>
+            <p class="hint" style="margin-bottom:6px;">
+              PCでご覧の場合は、リンクをコピーするか、QRコードをスマホで読み取って開いてください。<br>
+              ※リンクを他の方に転送しないようご注意ください。
+            </p>
+            <div class="line-copy-row">
+              <input id="lineLinkRaw" type="text" style="width:100%; padding:6px; font-size:0.9rem;" readonly value="${url}">
+              <button type="button" id="copyLineLinkBtn">リンクをコピーする</button>
+            </div>
+          </div>
+          <div class="line-qr" id="lineQrCode"></div>
+        </div>
+      `;
+      attachLineCompletionHandlers(url);
+    }
+
+    function attachLineCompletionHandlers(url) {
+      const copyBtn = document.getElementById("copyLineLinkBtn");
+      if (copyBtn) {
+        copyBtn.onclick = () => copyLineUrl(url);
+      }
+      const qrWrap = document.getElementById("lineQrCode");
+      if (qrWrap) {
+        qrWrap.innerHTML = `
+          <p class="hint" style="margin-bottom:8px;">PCでご覧の方はこのQRコードをスマホで読み取ってください。</p>
+        `;
+        const img = document.createElement("img");
+        img.src = buildQrImageUrl(url);
+        img.alt = "LINEリンクのQRコード";
+        img.loading = "lazy";
+        img.onerror = () => {
+          img.src = buildQrImageUrlFallback(url);
+        };
+        qrWrap.appendChild(img);
+      }
+    }
+
+    function buildQrImageUrl(text) {
+      return `https://chart.googleapis.com/chart?chs=240x240&cht=qr&chl=${encodeURIComponent(text)}&choe=UTF-8`;
+    }
+
+    function buildQrImageUrlFallback(text) {
+      return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(text)}`;
     }
 
     function resetReservation() {
