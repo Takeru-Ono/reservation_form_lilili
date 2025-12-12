@@ -215,6 +215,8 @@ function reserve(data) {
   const purpose = data.purpose;
   const peopleCount = Number(data.peopleCount);
   const lineRegistered = !!data.lineRegistered;
+  const orgName = data.orgName || "";
+  const activityDetail = data.activityDetail || "";
 
   if (!purpose) {
     throw new Error("利用目的が入力されていません");
@@ -239,11 +241,16 @@ function reserve(data) {
 
   // イベント作成
   slots.forEach((s) => {
+    const optionalLines = [];
+    if (orgName) optionalLines.push(`利用団体: ${orgName}`);
+    if (activityDetail) optionalLines.push(`活動内容: ${activityDetail}`);
+    const optionalText = optionalLines.length ? "\n" + optionalLines.join("\n") : "";
+
     cal.createEvent(`予約: ${data.name}`, s.start, s.end, {
       description: `名前: ${data.name}
 メール: ${data.email}
 内部コード: ${keyCode}
-トークン: ${token}`,
+トークン: ${token}${optionalText}`,
       guests: data.email, // カンマ区切り文字列で指定
       sendInvites: true,
     });
@@ -269,6 +276,8 @@ function reserve(data) {
         "", // link_status
         "", // link_updated_at
         "", // key_sent_at（案内送信日時）
+        orgName, // 利用団体名（任意）
+        activityDetail, // 活動内容（任意）
       ]);
     });
   }
@@ -516,7 +525,7 @@ function linkTokenAndSendKey_(userId, token) {
   const rowsForToken = [];
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    // row = [timestamp, start, end, name, email, agree, token, keyCode, line_user_id, purpose, people_count, link_status, link_updated_at, key_sent_at]
+    // row = [timestamp, start, end, name, email, agree, token, keyCode, line_user_id, purpose, people_count, link_status, link_updated_at, key_sent_at, org_name, activity_detail]
     const rowToken = row[6];
     if (rowToken === token) {
       rowsForToken.push({ index: i + 1, row: row }); // index は 1-based

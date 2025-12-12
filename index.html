@@ -463,6 +463,8 @@
       // 公式LINEの友だち追加URL
       const url = "https://lin.ee/606k43V";
       // iPhone / GAS 埋め込みでも抜けやすいように _blank で開く
+      hasOpenedLineLink = true;
+      applyLineCheckboxState();
       window.open(url, "_blank");
       // もしこれでもダメなら "_top" に変えてみてOK
       // window.open(url, "_top");
@@ -506,6 +508,7 @@
     // 選択状態
     let currentSelectedDate = null;
     let selectedSlots = [];
+    let hasOpenedLineLink = false;
 
     function clearFormErrors() {
       [
@@ -934,21 +937,35 @@
         </label>
         <div id="peopleCountError" class="error-text"></div><br>
 
+        <label>利用団体名（任意）: <br>
+          <input id="orgName" style="width: 100%; padding: 8px;" placeholder="例：◯◯サークル">
+        </label>
+        <br><br>
+
+        <label>活動内容（任意・URL可）: <br>
+          <textarea id="activityDetail" style="width: 100%; padding: 8px;" rows="2" placeholder="活動内容やHP/SNSのURLを入力してください"></textarea>
+        </label>
+        <br><br>
+
         <label>
           <input type="checkbox" id="agree" disabled>
           <span id="termsText" class="terms-link">利用規約</span>に同意する（<span id="showTerms" class="terms-link">内容を表示</span>）
         </label>
+        <p class="hint" style="margin:4px 0 10px;">※ 利用規約を開いて内容を確認するとチェックできます。</p>
         <div id="agreeError" class="error-text"></div><br>
 
         <label>
-          <input type="checkbox" id="lineRegistered">
-          公式LINEアカウントを登録しました／これから登録します
+          <input type="checkbox" id="lineRegistered" disabled>
+          <a href="#"
+             id="officialLineInline"
+             onclick="openOfficialLine(); return false;">公式LINE</a>アカウントを登録しました／これから登録します
           <span class="hint">
             （<a href="#"
                 id="officialLineLink"
                 onclick="openOfficialLine(); return false;">公式LINEはこちら</a>）
           </span>
         </label>
+        <p class="hint" style="margin:4px 0 10px;">※ LINEリンクを開くとチェックできるようになります。</p>
         <div id="lineRegisteredError" class="error-text"></div><br>
 
         <p class="hint">
@@ -970,6 +987,8 @@
       };
       attachTermsHandler(termsLink);
       attachTermsHandler(termsText);
+
+      applyLineCheckboxState();
 
       // フォームまで自動スクロール（モバイルでの操作性向上）
       scrollToId("formArea");
@@ -997,12 +1016,16 @@
       const peopleCountRaw = document.getElementById("peopleCount").value.trim();
       const peopleCount = peopleCountRaw ? Number(peopleCountRaw) : null;
       const lineRegistered = document.getElementById("lineRegistered").checked;
+      const orgName = document.getElementById("orgName") ? document.getElementById("orgName").value.trim() : "";
+      const activityDetail = document.getElementById("activityDetail") ? document.getElementById("activityDetail").value.trim() : "";
 
       const data = {
         name: document.getElementById("name").value.trim(),
         email,
         purpose,
         peopleCount,
+        orgName,
+        activityDetail,
         lineRegistered,
         agree: document.getElementById("agree").checked,
         slots: slotsPayload
@@ -1168,6 +1191,7 @@
     function resetReservation() {
       selectedSlots = [];
       currentSelectedDate = null;
+      hasOpenedLineLink = false;
       const formArea = document.getElementById("formArea");
       if (formArea) formArea.innerHTML = "";
       const slotsDiv = document.getElementById("slots");
@@ -1260,6 +1284,13 @@
         alert("コピーに失敗しました。手動でURLを選択してコピーしてください。");
       }
       document.body.removeChild(tmp);
+    }
+
+    function applyLineCheckboxState() {
+      const lineCheckbox = document.getElementById("lineRegistered");
+      if (!lineCheckbox) return;
+      lineCheckbox.disabled = !hasOpenedLineLink;
+      if (!hasOpenedLineLink) lineCheckbox.checked = false;
     }
 
     // 初期表示
