@@ -128,9 +128,7 @@ function getAvailability(year, month) {
     if (!isBusinessDay_(d, isHol)) continue;
 
     // その日のイベント一覧
-    const eventsForDay = monthlyEvents.filter((ev) =>
-      isEventOnDate_(ev, d)
-    );
+    const eventsForDay = monthlyEvents.filter((ev) => isEventOnDate_(ev, d));
 
     // 終日イベントがある日は表示しない
     const hasAllDayEvent = eventsForDay.some((ev) => ev.isAllDayEvent());
@@ -199,6 +197,13 @@ function reserve(data) {
     throw new Error("入力が不足しています");
   }
 
+  Logger.log(
+    "[reserve] lineUserId=" + (data.lineUserId || "null") + " email=" + data.email
+  );
+  if (!data.lineUserId) {
+    throw new Error("LINEアプリから開き直してください（ユーザーIDが取得できていません）");
+  }
+
   const cal = CalendarApp.getCalendarById(CONFIG.CALENDAR_ID);
   if (!cal) {
     throw new Error(
@@ -215,6 +220,7 @@ function reserve(data) {
   const purpose = data.purpose;
   const peopleCount = Number(data.peopleCount);
   const lineRegistered = !!data.lineRegistered;
+  const lineUserId = data.lineUserId || "";
   const orgName = data.orgName || "";
   const activityDetail = data.activityDetail || "";
 
@@ -231,6 +237,7 @@ function reserve(data) {
   // 🔑 トークン & 固定コード生成
   const token = generateToken_();
   const keyCode = CONFIG.KEY_CODE;
+  const now = new Date();
 
   // 二重予約チェック（ここは件数が少ないので getEvents でOK）
   slots.forEach((s) => {
@@ -244,7 +251,10 @@ function reserve(data) {
     const optionalLines = [];
     if (orgName) optionalLines.push(`利用団体: ${orgName}`);
     if (activityDetail) optionalLines.push(`活動内容: ${activityDetail}`);
-    const optionalText = optionalLines.length ? "\n" + optionalLines.join("\n") : "";
+    if (lineUserId) optionalLines.push(`LINEユーザーID: ${lineUserId}`);
+    const optionalText = optionalLines.length
+      ? "\n" + optionalLines.join("\n")
+      : "";
 
     cal.createEvent(`予約: ${data.name}`, s.start, s.end, {
       description: `名前: ${data.name}
@@ -262,22 +272,25 @@ function reserve(data) {
     const sheet = ss.getSheetByName("log") || ss.insertSheet("log");
     slots.forEach((s) => {
       sheet.appendRow([
-        new Date(), // ログ記録時刻
+        new Date(),
         s.start,
         s.end,
         data.name,
         data.email,
         data.agree,
-        token, // 予約トークン
-        keyCode, // 内部コード
-        "", // line_user_id（LINEユーザーID）
-        purpose, // 利用目的
-        peopleCount, // 利用人数
-        "", // link_status
-        "", // link_updated_at
-        "", // key_sent_at（案内送信日時）
-        orgName, // 利用団体名（任意）
-        activityDetail, // 活動内容（任意）
+        token,
+        keyCode,
+
+        lineUserId,
+        purpose,
+        peopleCount,
+
+        lineUserId ? "confirmed" : "",
+        lineUserId ? now : "",
+        "",
+
+        orgName,
+        activityDetail,
       ]);
     });
   }
@@ -316,7 +329,15 @@ function formatDate_(d) {
 
 // イベントが指定日（0:00〜翌0:00）にかかっているか判定
 function isEventOnDate_(ev, d) {
-  const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+  const dayStart = new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate(),
+    0,
+    0,
+    0,
+    0
+  );
   const nextDay = new Date(dayStart);
   nextDay.setDate(nextDay.getDate() + 1);
   const evStart = ev.getStartTime();
@@ -810,6 +831,8 @@ function sendKeysForTomorrow() {
       (purpose ? `利用目的：${purpose}\n` : "") +
       "\n" +
       "【当日のご案内】\n" +
+      "・Wi-Fi SSID: AiR-WiFi_0V49GH / パスワード: 55200973\n" +
+      "・入口横のポストにある封筒に a.利用者名 b.利用日時 c.金額 を記載し、お釣りのないよう現金を入れて投函してください。\n" +
       "・ご利用内容の確認と入退室の流れについて、事前にこのメッセージを保管しておいてください。\n\n" +
       "※ご利用日の2週間前以降のキャンセルはできません（キャンセル料100%）。\n" +
       "何かございましたら公式LINEにご連絡ください。\n" +

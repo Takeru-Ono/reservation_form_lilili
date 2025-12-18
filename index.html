@@ -300,6 +300,24 @@
 <body>
   <h1>学びのかまくら</h1>
   <h2>レンタルスペース予約フォーム</h2>
+  <pre id="debugArea" style="
+  white-space: pre-wrap;
+  background:#111;
+  color:#0f0;
+  padding:10px;
+  border-radius:8px;
+  font-size:12px;
+  line-height:1.35;
+  max-height:40vh;
+  overflow:auto;
+">debug ready</pre>
+  <div id="liffDebug" style="display:none; margin:8px 0; padding:8px; border:1px dashed #c24d16; background:#fff7f0; color:#c24d16; font-size:0.85rem; white-space:pre-wrap;"></div>
+  <div id="debugControls" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+    <button type="button" onclick="debugInit()">デバッグ: init</button>
+    <button type="button" onclick="debugProfile()">デバッグ: profile</button>
+    <button onclick="debugGranted()">debug: granted scopes</button>
+    <button onclick="debugAuth()">debug: auth</button>
+  </div>
   <p class="lead-text">ご希望の土日祝と時間帯をお選びください。</p>
 
   <div class="month-nav">
@@ -406,6 +424,239 @@
       </div>
     </div>
   </div>
+
+  
+
+  <!-- LIFF SDK -->
+<script
+  src="https://static.line-scdn.net/liff/edge/2/sdk.js"
+  onload="pushDebugSdk('sdk tag: loaded (liff=' + (typeof window.liff) + ')')"
+  onerror="pushDebugSdk('sdk tag: FAILED to load')"
+></script>
+
+<script>
+  pushDebugSdk("sdk tag: after load tag");
+</script>
+
+<script>
+  function pushDebugSdk(msg) {
+    const el = document.getElementById("debugArea");
+    if (el) el.textContent += "\n" + msg;
+  }
+  pushDebugSdk("sdk tag: before load");
+</script>
+
+<script>
+  const LIFF_ID = "2008710277-rUcZlfIr";
+
+  function loginOnce(reason) {
+  const key = "login_attempted";
+  if (sessionStorage.getItem(key)) {
+    pushDebug("loginOnce: already attempted, skip. reason=" + reason);
+    return false;
+  }
+  sessionStorage.setItem(key, "1");
+  pushDebug("loginOnce: redirecting to login. reason=" + reason);
+
+  // redirectUri を明示（元のページに戻す）
+  liff.login({
+    redirectUri: location.href,
+    scope: ["profile", "openid"],
+    prompt: "consent"
+  });
+  return true;
+}
+
+  let isInLiff = false;
+  let lineUserId = null;
+  let isFriend = false;
+  let liffReady = false;
+  let debugMessages = [];
+
+  async function initLiff() {
+    try {
+      pushDebug("init start");
+      await liff.init({ liffId: LIFF_ID });
+      isInLiff = true;
+      pushDebug(
+        "init done, isLoggedIn=" +
+          liff.isLoggedIn() +
+          " isInClient=" +
+          liff.isInClient() +
+          " ver=" +
+          (liff.getVersion ? liff.getVersion() : "n/a")
+      );
+      const ctx = liff.getContext ? liff.getContext() : null;
+      if (ctx) pushDebug("context type=" + ctx.type + " viewType=" + ctx.viewType);
+      pushDebug("accessToken=" + (liff.getAccessToken() ? "yes" : "no"));
+      const idToken = liff.getIDToken ? liff.getIDToken() : null;
+      if (idToken) pushDebug("idToken head=" + idToken.substring(0, 24));
+
+      if (!liff.isLoggedIn()) {
+        pushDebug("not logged in, triggering login (scope: profile/openid)");
+        loginOnce("not logged in");
+        return;
+      }
+
+      // 友だち追加チェック
+      const friendship = await liff.getFriendship();
+      pushDebug("friendFlag=" + friendship.friendFlag);
+      if (!friendship.friendFlag) {
+        // 追加を促す
+        await liff.addToFriend().catch(() => {});
+        const recheck = await liff.getFriendship();
+        pushDebug("friendFlag recheck=" + recheck.friendFlag);
+        if (!recheck.friendFlag) {
+          showLiffBlocked(
+            "公式LINEを友だち追加してから予約に進んでください。LINEアプリで公式アカウントを開き、メニューから予約をタップしてください。"
+          );
+          return;
+        }
+      }
+      isFriend = true;
+
+      let profile;
+      try {
+        profile = await liff.getProfile();
+      } catch (err) {
+        pushDebug(
+          "getProfile error: " +
+            err +
+            " (LIFF設定で scope=profile が有効か、再ログインで権限付与されているか確認してください)"
+        );
+        // 権限不足の場合は再ログインを促す
+        loginOnce("getProfile error");
+        return;
+      }
+      lineUserId = profile?.userId ?? null;
+      pushDebug("profile userId=" + (lineUserId || "null"));
+      if (lineUserId) {
+        hasOpenedLineLink = true; // LINE内で開いていれば友だち登録前提で扱う
+        applyLineCheckboxState();
+      } else {
+        showLiffBlocked(
+          "LINEアプリの公式アカウントから予約を開いてください。ブラウザではユーザーIDが取得できません。"
+        );
+        return;
+      }
+
+      liffReady = true;
+      pushDebug("liffReady=true");
+
+    } catch (e) {
+      console.log("LIFF init error", e);
+      pushDebug("LIFF init error: " + e);
+      showLiffBlocked(
+        "LINEアプリの公式アカウントから予約を開いてください。ブラウザでは予約できません。"
+      );
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    if (window.liff) initLiff();
+  });
+
+  function showLiffBlocked(message) {
+    const datesDiv = document.getElementById("dates");
+    const slotsDiv = document.getElementById("slots");
+    const formArea = document.getElementById("formArea");
+    const label = document.getElementById("currentMonthLabel");
+    if (label) label.textContent = "";
+    if (datesDiv) datesDiv.innerHTML = `<p style="color:#c24d16;">${message}</p>`;
+    if (slotsDiv) slotsDiv.innerHTML = "";
+    if (formArea) formArea.innerHTML = "";
+  }
+
+function pushDebug(msg) {
+  const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  debugMessages.push(line);
+
+  // 1) debugArea（常に見える）
+  const a = document.getElementById("debugArea");
+  if (a) a.textContent = debugMessages.join("\n");
+
+  // 2) liffDebug（既存も活かす）
+  const b = document.getElementById("liffDebug");
+  if (b) {
+    b.style.display = "block";
+    b.textContent = debugMessages.join("\n");
+  }
+}
+  async function debugAuth() {
+  pushDebug("auth start");
+  try {
+    pushDebug("isInClient=" + liff.isInClient());
+    pushDebug("isLoggedIn=" + liff.isLoggedIn());
+    pushDebug("context=" + JSON.stringify(liff.getContext?.() || null));
+
+    if (!liff.isLoggedIn()) {
+      pushDebug("-> calling login");
+      // まずは素直にログイン
+      loginOnce("debugAuth");
+      return;
+    }
+
+    const token = liff.getAccessToken?.();
+    pushDebug("accessToken=" + (token ? "yes" : "no"));
+    pushDebug("idToken=" + (liff.getIDToken?.() ? "yes" : "no"));
+  } catch (e) {
+    pushDebug("auth error: " + (e?.message || e));
+  }
+}
+
+  async function debugGranted() {
+  try {
+    pushDebug("granted start");
+    // v2.27.0+ で使える
+    const scopes = await liff.permission.getGrantedAll();
+    pushDebug("granted = " + JSON.stringify(scopes));
+    // ここに "profile" が入ってないなら、設定ONでも「同意されてない」確定
+  } catch (e) {
+    pushDebug("granted error: " + (e?.message || e));
+  }
+}
+
+async function debugInit() {
+  try {
+    pushDebug("manual init start");
+    pushDebug("typeof liff=" + (typeof window.liff));
+    if (!window.liff) {
+      pushDebug("liff is undefined -> SDK not loaded");
+      return;
+    }
+
+    const timeoutMs = 8000;
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("liff.init timeout " + timeoutMs + "ms")), timeoutMs)
+    );
+
+    const initPromise = window.liff.init({ liffId: LIFF_ID });
+
+    await Promise.race([initPromise, timeout]);
+
+    pushDebug("manual init done");
+    pushDebug("isInClient=" + window.liff.isInClient());
+    pushDebug("isLoggedIn=" + window.liff.isLoggedIn());
+    pushDebug("liff.getVersion=" + (window.liff.getVersion ? window.liff.getVersion() : "n/a"));
+  } catch (e) {
+    pushDebug("manual init error: " + (e && e.message ? e.message : String(e)));
+  }
+}
+
+  async function debugProfile() {
+    try {
+      const profile = await liff.getProfile();
+      pushDebug(
+        "manual profile userId=" +
+          (profile?.userId || "null") +
+          " name=" +
+          (profile?.displayName || "")
+      );
+    } catch (e) {
+      pushDebug("manual profile error: " + e);
+    }
+  }
+</script>
 
   <script>
     const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -517,8 +768,7 @@
         "emailError",
         "purposeError",
         "peopleCountError",
-        "agreeError",
-        "lineRegisteredError",
+        "agreeError"
       ].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.textContent = "";
@@ -942,8 +1192,8 @@
         </label>
         <br><br>
 
-        <label>活動内容（任意・URL可）: <br>
-          <textarea id="activityDetail" style="width: 100%; padding: 8px;" rows="2" placeholder="活動内容やHP/SNSのURLを入力してください"></textarea>
+        <label>団体の活動内容（任意・URL可）: <br>
+          <textarea id="activityDetail" style="width: 100%; padding: 8px;" rows="2" placeholder="もしお持ちであればHP/SNSのURLも入力してください"></textarea>
         </label>
         <br><br>
 
@@ -953,20 +1203,6 @@
         </label>
         <p class="hint" style="margin:4px 0 10px;">※ 利用規約を開いて内容を確認するとチェックできます。</p>
         <div id="agreeError" class="error-text"></div><br>
-
-        <label>
-          <input type="checkbox" id="lineRegistered" disabled>
-          <a href="#"
-             id="officialLineInline"
-             onclick="openOfficialLine(); return false;">公式LINE</a>アカウントを登録しました／これから登録します
-          <span class="hint">
-            （<a href="#"
-                id="officialLineLink"
-                onclick="openOfficialLine(); return false;">公式LINEはこちら</a>）
-          </span>
-        </label>
-        <p class="hint" style="margin:4px 0 10px;">※ LINEリンクを開くとチェックできるようになります。</p>
-        <div id="lineRegisteredError" class="error-text"></div><br>
 
         <p class="hint">
           ※ご利用日の2週間前以降のキャンセルはできません（キャンセル料100%）。
@@ -997,7 +1233,15 @@
     // 予約実行
     function reserve() {
       clearFormErrors();
-     
+
+      if (!isInLiff || !lineUserId || !liffReady) {
+        const formError = document.getElementById("formGeneralError");
+        if (formError) {
+          formError.textContent =
+            "公式LINEのメニューから開き直してください（ユーザーIDが取得できていません）。";
+        }
+        return;
+      }
 
       if (!currentSelectedDate || selectedSlots.length === 0) {
         const formError = document.getElementById("formGeneralError");
@@ -1015,7 +1259,7 @@
       const purpose = document.getElementById("purpose").value.trim();
       const peopleCountRaw = document.getElementById("peopleCount").value.trim();
       const peopleCount = peopleCountRaw ? Number(peopleCountRaw) : null;
-      const lineRegistered = document.getElementById("lineRegistered").checked;
+      const lineRegistered = true; // 公式LINE内でのみ利用
       const orgName = document.getElementById("orgName") ? document.getElementById("orgName").value.trim() : "";
       const activityDetail = document.getElementById("activityDetail") ? document.getElementById("activityDetail").value.trim() : "";
 
@@ -1028,7 +1272,8 @@
         activityDetail,
         lineRegistered,
         agree: document.getElementById("agree").checked,
-        slots: slotsPayload
+        slots: slotsPayload,
+        lineUserId: lineUserId
       };
 
       let hasError = false;
@@ -1065,11 +1310,6 @@
         if (el) el.textContent = "利用規約への同意が必要です";
         hasError = true;
       }
-      if (!lineRegistered) {
-        const el = document.getElementById("lineRegisteredError");
-        if (el) el.textContent = "公式LINEの登録について確認が必要です";
-        hasError = true;
-      }
 
       if (hasError) {
         return;
@@ -1089,7 +1329,7 @@
       }
 
       google.script.run
-        .withSuccessHandler((res) => {
+        .withSuccessHandler(async (res) => {
           const formArea = document.getElementById("formArea");
           const slotsDiv = document.getElementById("slots");
           if (slotsDiv) slotsDiv.innerHTML = "";
@@ -1097,22 +1337,31 @@
           const token = res && res.token;
           if (!formArea) return;
 
-          if (!token) {
-            // トークンが取れなかった場合は従来どおりの完了表示＋戻る
-            formArea.innerHTML = `
-              <h3>予約の送信をしました！</h3>
-              <p>ご入力いただいた内容をもとに予約を登録しました。</p>
-              <p class="hint">※LINE連携用の情報取得に失敗しました。お手数ですが運営までお問い合わせください。</p>
-              <button onclick="resetReservation()">元の画面に戻る</button>
-            `;
-          } else {
-            const presetMessage =
+          if (isInLiff && token) {
+            const msg =
               "【学びのかまくら】レンタルスペース\n" +
-              "当日のご案内をLINEでお届けするための予約番号です。\n" +
-              "このまま送信してください。\n\n" +
-              token;
-            const url = lineLinkBaseUrl + encodeURIComponent(presetMessage);
-            renderLineCompletion(formArea, url);
+              "予約を受け付けました。\n" +
+              "このLINEアカウントと予約を紐づけました。\n" +
+              "ご利用日前日10時ごろに、このトークに当日のご案内をお送りします。";
+
+            try {
+              await liff.sendMessages([{ type: "text", text: msg }]);
+              formArea.innerHTML = `
+                <h3>ご予約ありがとうございました！</h3>
+                <p>LINEに確認メッセージを送信しました。予約番号の送信は不要です。</p>
+                <button onclick="resetReservation()">元の画面に戻る</button>
+              `;
+            } catch (e) {
+              formArea.innerHTML = `
+                <h3>ご予約ありがとうございました！</h3>
+                <p>LINEから開き直して再送信してください。予約番号の送信は不要です。</p>
+              `;
+            }
+          } else {
+            formArea.innerHTML = `
+              <h3>LINEからご利用ください</h3>
+              <p>公式LINEのメニューから予約を開き直してご利用ください。</p>
+            `;
           }
           clearCaches();
 
@@ -1286,12 +1535,9 @@
       document.body.removeChild(tmp);
     }
 
-    function applyLineCheckboxState() {
-      const lineCheckbox = document.getElementById("lineRegistered");
-      if (!lineCheckbox) return;
-      lineCheckbox.disabled = !hasOpenedLineLink;
-      if (!hasOpenedLineLink) lineCheckbox.checked = false;
-    }
+  function applyLineCheckboxState() {
+    // 友だち追加必須化したので特に何もしない
+  }
 
     // 初期表示
     loadCurrentMonth();
