@@ -429,23 +429,39 @@
   
 
   <!-- LIFF SDK -->
-<script
-  src="https://static.line-scdn.net/liff/edge/2/sdk.js"
-  onload="pushDebugSdk('sdk tag: loaded (liff=' + (typeof window.liff) + ')')"
-  onerror="pushDebugSdk('sdk tag: FAILED to load')"
-></script>
+  <script>
+    // SDK読み込み前に必ず定義しておく（onload/onerror で呼ばれるため）
+    function pushDebugSdk(msg) {
+      const el = document.getElementById("debugArea");
+      if (el) el.textContent += "\n" + msg;
+    }
 
-<script>
-  pushDebugSdk("sdk tag: after load tag");
-</script>
+    // SDKロード完了後に確実に init する
+    function onLiffSdkLoaded() {
+      pushDebugSdk('sdk tag: loaded (liff=' + (typeof window.liff) + ')');
+      // DOMがまだなら待つ
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          if (window.liff) initLiff();
+        });
+      } else {
+        if (window.liff) initLiff();
+      }
+    }
 
-<script>
-  function pushDebugSdk(msg) {
-    const el = document.getElementById("debugArea");
-    if (el) el.textContent += "\n" + msg;
-  }
-  pushDebugSdk("sdk tag: before load");
-</script>
+    function onLiffSdkError() {
+      pushDebugSdk('sdk tag: FAILED to load');
+      showLiffBlocked('LIFF SDKの読み込みに失敗しました。通信環境をご確認のうえ、LINEアプリ内で開き直してください。');
+    }
+
+    pushDebugSdk("sdk tag: before load");
+  </script>
+
+  <script
+    src="https://static.line-scdn.net/liff/edge/2/sdk.js"
+    onload="onLiffSdkLoaded()"
+    onerror="onLiffSdkError()"
+  ></script>
 
 <script>
   const LIFF_ID = "2008710277-rUcZlfIr";
@@ -459,11 +475,9 @@
   sessionStorage.setItem(key, "1");
   pushDebug("loginOnce: redirecting to login. reason=" + reason);
 
-  // redirectUri を明示（元のページに戻す）
+  // scope は LIFFコンソール側で設定する（liff.login の引数で渡しても反映されない/不安定なことがある）
   liff.login({
-    redirectUri: location.href,
-    scope: ["profile", "openid"],
-    prompt: "consent"
+    redirectUri: location.href
   });
   return true;
 }
@@ -478,7 +492,7 @@
     try {
       pushDebug("init start");
       await liff.init({ liffId: LIFF_ID });
-      isInLiff = true;
+      isInLiff = liff.isInClient();
       pushDebug(
         "init done, isLoggedIn=" +
           liff.isLoggedIn() +
@@ -553,8 +567,9 @@
     }
   }
 
+  // init は SDK onload 側で行う（DOMContentLoaded 時点で SDK が未ロードのことがあるため）
   document.addEventListener("DOMContentLoaded", () => {
-    if (window.liff) initLiff();
+    // 何もしない（onLiffSdkLoaded() から initLiff() が呼ばれる）
   });
 
   function showLiffBlocked(message) {
