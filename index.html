@@ -300,25 +300,6 @@
 <body>
   <h1>学びのかまくら</h1>
   <h2>レンタルスペース予約フォーム</h2>
-  <pre id="debugArea" style="
-  white-space: pre-wrap;
-  background:#111;
-  color:#0f0;
-  padding:10px;
-  border-radius:8px;
-  font-size:12px;
-  line-height:1.35;
-  max-height:40vh;
-  overflow:auto;
-">debug ready</pre>
-  <div id="liffDebug" style="display:none; margin:8px 0; padding:8px; border:1px dashed #c24d16; background:#fff7f0; color:#c24d16; font-size:0.85rem; white-space:pre-wrap;"></div>
-  <div id="debugControls" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
-    <button type="button" onclick="debugInit()">デバッグ: init</button>
-    <button type="button" onclick="debugProfile()">デバッグ: profile</button>
-    <button onclick="debugGranted()">debug: granted scopes</button>
-    <button onclick="debugAuth()">debug: auth</button>
-    <button type="button" onclick="forceReauth()">再ログイン（権限リセット）</button>
-  </div>
   <p class="lead-text">ご希望の土日祝と時間帯をお選びください。</p>
 
   <div class="month-nav">
@@ -595,16 +576,7 @@ function pushDebug(msg) {
   const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
   debugMessages.push(line);
 
-  // 1) debugArea（常に見える）
-  const a = document.getElementById("debugArea");
-  if (a) a.textContent = debugMessages.join("\n");
-
-  // 2) liffDebug（既存も活かす）
-  const b = document.getElementById("liffDebug");
-  if (b) {
-    b.style.display = "block";
-    b.textContent = debugMessages.join("\n");
-  }
+  // DOM にデバッグ表示は出さない（ログのみ保持）
 }
 
 function startAppIfReady() {
@@ -614,82 +586,7 @@ function startAppIfReady() {
   pushDebug("startApp: load availability");
   loadCurrentMonth();
 }
-  async function debugAuth() {
-  pushDebug("auth start");
-  try {
-    pushDebug("isInClient=" + liff.isInClient());
-    pushDebug("isLoggedIn=" + liff.isLoggedIn());
-    pushDebug("context=" + JSON.stringify(liff.getContext?.() || null));
-
-    if (!liff.isLoggedIn()) {
-      pushDebug("-> calling login");
-      // まずは素直にログイン
-      loginOnce("debugAuth");
-      return;
-    }
-
-    const token = liff.getAccessToken?.();
-    pushDebug("accessToken=" + (token ? "yes" : "no"));
-    pushDebug("idToken=" + (liff.getIDToken?.() ? "yes" : "no"));
-  } catch (e) {
-    pushDebug("auth error: " + (e?.message || e));
-  }
-}
-
-  async function debugGranted() {
-  try {
-    pushDebug("granted start");
-    // v2.27.0+ で使える
-    const scopes = await liff.permission.getGrantedAll();
-    pushDebug("granted = " + JSON.stringify(scopes));
-    // ここに "profile" が入ってないなら、設定ONでも「同意されてない」確定
-  } catch (e) {
-    pushDebug("granted error: " + (e?.message || e));
-  }
-}
-
-async function debugInit() {
-  try {
-    pushDebug("manual init start");
-    pushDebug("typeof liff=" + (typeof window.liff));
-    pushDebug("LIFF_ID=" + LIFF_ID);
-    pushDebug("href=" + location.href);
-    if (!window.liff) {
-      pushDebug("liff is undefined -> SDK not loaded");
-      return;
-    }
-
-    const timeoutMs = 8000;
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("liff.init timeout " + timeoutMs + "ms")), timeoutMs)
-    );
-
-    const initPromise = window.liff.init({ liffId: LIFF_ID });
-
-    await Promise.race([initPromise, timeout]);
-
-    pushDebug("manual init done");
-    pushDebug("isInClient=" + window.liff.isInClient());
-    pushDebug("isLoggedIn=" + window.liff.isLoggedIn());
-    pushDebug("liff.getVersion=" + (window.liff.getVersion ? window.liff.getVersion() : "n/a"));
-  } catch (e) {
-    pushDebug("manual init error: " + (e && e.message ? e.message : String(e)));
-  }
-}
-
-  async function debugProfile() {
-    try {
-      const profile = await liff.getProfile();
-      pushDebug(
-        "manual profile userId=" +
-          (profile?.userId || "null") +
-          " name=" +
-          (profile?.displayName || "")
-      );
-    } catch (e) {
-      pushDebug("manual profile error: " + e);
-    }
-  }
+  // デバッグ用の補助関数は削除（pushDebug は残して動作ログのみ表示）
 </script>
 
   <script>
