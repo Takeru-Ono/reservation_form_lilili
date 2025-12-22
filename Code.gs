@@ -18,6 +18,7 @@ const CONFIG = {
   KEY_CODE: PROPS.getProperty("KEY_CODE"),
   LINE_ACCESS_TOKEN: PROPS.getProperty("LINE_ACCESS_TOKEN"),
   LINE_BASIC_ID: PROPS.getProperty("LINE_BASIC_ID"),
+  LINE_CHANNEL_ID: PROPS.getProperty("LINE_CHANNEL_ID"),
   // MODE: "prod",
 };
 
@@ -458,25 +459,87 @@ function buildFreeSlotsForDateFromEvents_(d, eventsForDay) {
 // =========================
 function doPost(e) {
   try {
-    if (e && e.postData && e.postData.contents) {
-      const json = JSON.parse(e.postData.contents);
-      // 受信内容をログに出しておく（デバッグ用）
+    const body = e && e.postData && e.postData.contents;
+    if (!body) {
+      return createJsonResponse_({ ok: false, error: "no postData" });
+    }
+
+    const json = JSON.parse(body);
+
+    // フロントエンドからの API 呼び出し
+    if (json && json.action) {
+      return handleApiAction_(json);
+    }
+
+    // LINE Messaging API の Webhook
+    if (json && json.events) {
       Logger.log(JSON.stringify(json, null, 2));
       const events = json.events || [];
       events.forEach(handleLineEvent_);
-    } else {
-      Logger.log("no postData");
+      return ContentService.createTextOutput("OK").setMimeType(
+        ContentService.MimeType.TEXT_PLAIN
+      );
     }
 
-    return ContentService.createTextOutput("OK").setMimeType(
-      ContentService.MimeType.TEXT_PLAIN
-    );
+    return createJsonResponse_({ ok: false, error: "invalid payload" });
   } catch (err) {
     Logger.log("ERROR in doPost: " + err);
-    return ContentService.createTextOutput("NG").setMimeType(
-      ContentService.MimeType.TEXT_PLAIN
-    );
+    return createJsonResponse_({
+      ok: false,
+      error: err && err.message ? err.message : String(err),
+    });
   }
+}
+
+// フロントエンドからの action をルーティング
+function handleApiAction_(req) {
+  const action = req && req.action;
+  const payload = (req && req.payload) || {};
+  const accessToken = req && req.accessToken;
+
+  if (!action) {
+    return createJsonResponse_({ ok: false, error: "action is required" });
+  }
+  if (!accessToken) {
+    return createJsonResponse_({
+      ok: false,
+      error: "LINE accessToken is required",
+    });
+  }
+
+  const verifyResult = verifyLineAccessToken_(accessToken);
+  const profile = fetchLineProfileFromToken_(accessToken);
+  const userId =
+    (profile && profile.userId) || payload.lineUserId || verifyResult.sub || null;
+
+  let result;
+  switch (action) {
+    case "getAvailability":
+      result = getAvailability(payload.year, payload.month);
+      break;
+    case "getSlots":
+      result = getSlots(payload.date);
+      break;
+    case "reserve":
+      result = reserve({ ...payload, lineUserId: userId });
+      break;
+    default:
+      return createJsonResponse_({
+        ok: false,
+        error: "unsupported action: " + action,
+      });
+  }
+
+  return createJsonResponse_({
+    ok: true,
+    result,
+    lineUserId: userId,
+    verify: {
+      client_id: verifyResult.client_id || null,
+      expires_in: verifyResult.expires_in || null,
+      scope: verifyResult.scope || null,
+    },
+  });
 }
 
 // 各イベントの処理
@@ -878,6 +941,74 @@ function sendLineMessage_(userId, text) {
   Logger.log(
     "LINE push response: " + res.getResponseCode() + " " + res.getContentText()
   );
+}
+
+function createJsonResponse_(obj) {
+  const output = ContentService.createTextOutput(JSON.stringify(obj || {}));
+  output.setMimeType(ContentService.MimeType.JSON);
+  return output;
+}
+
+function verifyLineAccessToken_(accessToken) {
+  if (!accessToken) {
+    throw new Error("LINE accessToken is required");
+  }
+
+  const url =
+    "https://api.line.me/oauth2/v2.1/verify?access_token=" +
+    encodeURIComponent(accessToken);
+  const res = UrlFetchApp.fetch(url, {
+    method: "get",
+    muteHttpExceptions: true,
+  });
+
+  const status = res.getResponseCode();
+  const text = res.getContentText();
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch (parseError) {
+    Logger.log("verifyLineAccessToken_ parse error: " + parseError);
+  }
+
+  if (status !== 200 || !json) {
+    throw new Error("LINE verify failed: " + text);
+  }
+
+  if (CONFIG.LINE_CHANNEL_ID && json.client_id) {
+    if (json.client_id !== CONFIG.LINE_CHANNEL_ID) {
+      throw new Error("LINE accessToken issued for different channel");
+    }
+  }
+
+  return json;
+}
+
+function fetchLineProfileFromToken_(accessToken) {
+  if (!accessToken) {
+    throw new Error("LINE accessToken is required");
+  }
+
+  const res = UrlFetchApp.fetch("https://api.line.me/v2/profile", {
+    method: "get",
+    headers: { Authorization: "Bearer " + accessToken },
+    muteHttpExceptions: true,
+  });
+
+  const status = res.getResponseCode();
+  const text = res.getContentText();
+  if (status !== 200) {
+    throw new Error("LINE profile fetch failed: " + text);
+  }
+
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch (parseError) {
+    throw new Error("LINE profile parse failed: " + parseError);
+  }
+
+  return json;
 }
 
 function pushTest() {

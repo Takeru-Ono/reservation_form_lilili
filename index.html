@@ -466,6 +466,8 @@
 <script>
   // リッチメニューのリンク（https://liff.line.me/...）の末尾と同じ LIFF ID を設定する
   const LIFF_ID = "2008710277-M0fwyTiO";
+  const GAS_API_ENDPOINT = "https://script.google.com/macros/s/AKfycbynV77umUU0jXEX2UVb2qTYsYIjYVENVex-FhQkqVPHXC4Y_m0mer3muUbb2_7h1Aiu/exec"; // デプロイ先に合わせて変更
+  const API_TIMEOUT_MS = 12000;
 
   function loginOnce(reason) {
   const key = "login_attempted";
@@ -487,6 +489,8 @@
   let lineUserId = null;
   let isFriend = false;
   let liffReady = false;
+  let liffAccessToken = null;
+  let appStarted = false;
   let debugMessages = [];
 
   async function initLiff() {
@@ -504,7 +508,8 @@
       );
       const ctx = liff.getContext ? liff.getContext() : null;
       if (ctx) pushDebug("context type=" + ctx.type + " viewType=" + ctx.viewType);
-      pushDebug("accessToken=" + (liff.getAccessToken() ? "yes" : "no"));
+      liffAccessToken = liff.getAccessToken ? liff.getAccessToken() : null;
+      pushDebug("accessToken=" + (liffAccessToken ? "yes" : "no"));
       const idToken = liff.getIDToken ? liff.getIDToken() : null;
       if (idToken) pushDebug("idToken head=" + idToken.substring(0, 24));
 
@@ -545,6 +550,7 @@
         return;
       }
       lineUserId = profile?.userId ?? null;
+      pushDebug("lineUserId=" + (lineUserId || "null"));
       pushDebug("profile userId=" + (lineUserId || "null"));
       if (lineUserId) {
         hasOpenedLineLink = true; // LINE内で開いていれば友だち登録前提で扱う
@@ -558,6 +564,7 @@
 
       liffReady = true;
       pushDebug("liffReady=true");
+      startAppIfReady();
 
     } catch (e) {
       console.log("LIFF init error", e);
@@ -598,6 +605,14 @@ function pushDebug(msg) {
     b.style.display = "block";
     b.textContent = debugMessages.join("\n");
   }
+}
+
+function startAppIfReady() {
+  if (appStarted) return;
+  if (!liffReady || !lineUserId) return;
+  appStarted = true;
+  pushDebug("startApp: load availability");
+  loadCurrentMonth();
 }
   async function debugAuth() {
   pushDebug("auth start");
@@ -678,6 +693,62 @@ async function debugInit() {
 </script>
 
   <script>
+    async function gasApi(action, payload) {
+      const token =
+        liffAccessToken ||
+        (window.liff && liff.getAccessToken ? liff.getAccessToken() : null);
+      if (!token) {
+        throw new Error(
+          "LINE accessToken が取得できませんでした。LINEアプリから開き直してください。"
+        );
+      }
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+      pushDebug(`api ${action} -> request`);
+      let response;
+      try {
+        response = await fetch(GAS_API_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            payload,
+            accessToken: token
+          }),
+          signal: controller.signal
+        });
+      } catch (err) {
+        if (err && err.name === "AbortError") {
+          throw new Error("API timeout");
+        }
+        throw err;
+      } finally {
+        clearTimeout(timer);
+      }
+
+      const text = await response.text();
+      let json = null;
+      try {
+        json = JSON.parse(text);
+      } catch (parseErr) {
+        pushDebug(`api ${action} parse error: ${parseErr}`);
+      }
+      pushDebug(
+        `api ${action} status=${response.status} ok=${json ? json.ok : "n/a"}`
+      );
+      if (!response.ok || !json || json.ok === false || json.error) {
+        const errMsg = (json && json.error) || `API error: ${response.status}`;
+        throw new Error(errMsg);
+      }
+
+      const result = json.result !== undefined ? json.result : json;
+      if (action === "reserve") {
+        pushDebug("reserve response: " + JSON.stringify(result));
+      }
+      return result;
+    }
+
     const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
     // 🔗 LINE連携用ベースURL（ここをあなたのLINE連携用WebアプリURLに差し替える）
@@ -832,7 +903,14 @@ async function debugInit() {
     // ====================
     // 月ごとの日付リスト表示（サーバーの getAvailability から取得）
     // ====================
-    function loadCurrentMonth() {
+    async function loadCurrentMonth() {
+      if (!liffReady || !lineUserId) {
+        showLiffBlocked(
+          "LINEアプリのメニューから開き直してください（認証が必要です）。"
+        );
+        return;
+      }
+
       const year = currentMonth.getFullYear();
       const month = currentMonth.getMonth() + 1; // 1-12
       const key = `${year}-${String(month).padStart(2, "0")}`;
@@ -846,12 +924,18 @@ async function debugInit() {
 
       // キャッシュがなければサーバーへ
       showLoading("dates");
-      google.script.run
-        .withSuccessHandler(list => {
-          availabilityCache[key] = list; // キャッシュに保存
-          renderCurrentMonth(list);
-        })
-        .getAvailability(year, month);
+      try {
+        const list = await gasApi("getAvailability", { year, month });
+        pushDebug("getAvailability ok: " + list.length + " days");
+        availabilityCache[key] = list; // キャッシュに保存
+        renderCurrentMonth(list);
+      } catch (err) {
+        pushDebug("getAvailability error: " + err);
+        const datesDiv = document.getElementById("dates");
+        if (datesDiv) {
+          datesDiv.innerHTML = `<p style="color:#c24d16;">読み込みに失敗しました。${err.message || err}</p>`;
+        }
+      }
     }
 
     function renderCurrentMonth(list) {
@@ -924,9 +1008,17 @@ async function debugInit() {
     }
 
     // 時間枠読み込み
-    function loadSlots(date) {
+    async function loadSlots(date) {
+      if (!liffReady || !lineUserId) {
+        showLiffBlocked(
+          "LINEアプリのメニューから開き直してください（認証が必要です）。"
+        );
+        return;
+      }
+
       showLoading("slots");
-      document.getElementById("formArea").innerHTML = "";
+      const formAreaTarget = document.getElementById("formArea");
+      if (formAreaTarget) formAreaTarget.innerHTML = "";
 
       currentSelectedDate = date;
       selectedSlots = [];
@@ -942,13 +1034,19 @@ async function debugInit() {
       }
 
       // キャッシュがなければサーバーへ
-      google.script.run
-        .withSuccessHandler(slots => {
-          slotsCache[date] = slots; // キャッシュ保存
-          renderSlotsForDate(date, weekdayLabel, slots);
-          scrollToId("slots");
-        })
-        .getSlots(date);
+      try {
+        const slots = await gasApi("getSlots", { date });
+        pushDebug("getSlots ok: " + (slots ? slots.length : 0) + " slots");
+        slotsCache[date] = slots; // キャッシュ保存
+        renderSlotsForDate(date, weekdayLabel, slots);
+        scrollToId("slots");
+      } catch (err) {
+        pushDebug("getSlots error: " + err);
+        const slotsDiv = document.getElementById("slots");
+        if (slotsDiv) {
+          slotsDiv.innerHTML = `<p style="color:#c24d16;">時間枠の取得に失敗しました。${err.message || err}</p>`;
+        }
+      }
     }
 
     function toTimeKey(isoString) {
@@ -1250,7 +1348,7 @@ async function debugInit() {
     }
 
     // 予約実行
-    function reserve() {
+    async function reserve() {
       clearFormErrors();
 
       if (!isInLiff || !lineUserId || !liffReady) {
@@ -1347,58 +1445,63 @@ async function debugInit() {
         `;
       }
 
-      google.script.run
-        .withSuccessHandler(async (res) => {
-          const formArea = document.getElementById("formArea");
-          const slotsDiv = document.getElementById("slots");
-          if (slotsDiv) slotsDiv.innerHTML = "";
+      try {
+        liffAccessToken =
+          (window.liff && liff.getAccessToken ? liff.getAccessToken() : null) ||
+          liffAccessToken;
+        const res = await gasApi("reserve", data);
+        const formArea = document.getElementById("formArea");
+        const slotsDiv = document.getElementById("slots");
+        if (slotsDiv) slotsDiv.innerHTML = "";
 
-          const token = res && res.token;
-          if (!formArea) return;
+        const token = res && res.token;
+        pushDebug("reserve done token=" + (token || "none"));
+        if (!formArea) return;
 
-          if (isInLiff && token) {
-            const msg =
-              "【学びのかまくら】レンタルスペース\n" +
-              "予約を受け付けました。\n" +
-              "このLINEアカウントと予約を紐づけました。\n" +
-              "ご利用日前日10時ごろに、このトークに当日のご案内をお送りします。";
+        if (isInLiff && token) {
+          const msg =
+            "【学びのかまくら】レンタルスペース\n" +
+            "予約を受け付けました。\n" +
+            "このLINEアカウントと予約を紐づけました。\n" +
+            "ご利用日前日10時ごろに、このトークに当日のご案内をお送りします。";
 
-            try {
-              await liff.sendMessages([{ type: "text", text: msg }]);
-              formArea.innerHTML = `
-                <h3>ご予約ありがとうございました！</h3>
-                <p>LINEに確認メッセージを送信しました。予約番号の送信は不要です。</p>
-                <button onclick="resetReservation()">元の画面に戻る</button>
-              `;
-            } catch (e) {
-              formArea.innerHTML = `
-                <h3>ご予約ありがとうございました！</h3>
-                <p>LINEから開き直して再送信してください。予約番号の送信は不要です。</p>
-              `;
-            }
-          } else {
+          try {
+            await liff.sendMessages([{ type: "text", text: msg }]);
             formArea.innerHTML = `
-              <h3>LINEからご利用ください</h3>
-              <p>公式LINEのメニューから予約を開き直してご利用ください。</p>
+              <h3>ご予約ありがとうございました！</h3>
+              <p>LINEに確認メッセージを送信しました。予約番号の送信は不要です。</p>
+              <button onclick="resetReservation()">元の画面に戻る</button>
+            `;
+          } catch (e) {
+            formArea.innerHTML = `
+              <h3>ご予約ありがとうございました！</h3>
+              <p>LINEから開き直して再送信してください。予約番号の送信は不要です。</p>
             `;
           }
-          clearCaches();
+        } else {
+          formArea.innerHTML = `
+            <h3>LINEからご利用ください</h3>
+            <p>公式LINEのメニューから予約を開き直してご利用ください。</p>
+          `;
+        }
+        clearCaches();
 
-          currentSelectedDate = null;
-          selectedSlots = [];
-          setCalendarEnabled(true);
-          document.body.classList.remove("app-busy");
-        })
-        .withFailureHandler(err => {
-          // エラー時はフォームを再表示してメッセージを出す
-          renderSelectionForm();
-          const formError = document.getElementById("formGeneralError");
-          if (formError) formError.textContent = "送信中にエラーが発生しました。時間をおいてお試しください。";
-          alert("エラー: " + err.message);
-          setCalendarEnabled(true);
-          document.body.classList.remove("app-busy");
-        })
-        .reserve(data);
+        currentSelectedDate = null;
+        selectedSlots = [];
+      } catch (err) {
+        // エラー時はフォームを再表示してメッセージを出す
+        renderSelectionForm();
+        const formError = document.getElementById("formGeneralError");
+        if (formError) {
+          formError.textContent =
+            "送信中にエラーが発生しました。時間をおいてお試しください。";
+        }
+        alert("エラー: " + (err && err.message ? err.message : err));
+        pushDebug("reserve error: " + err);
+      } finally {
+        setCalendarEnabled(true);
+        document.body.classList.remove("app-busy");
+      }
     }
 
     function renderLineCompletion(formArea, url) {
@@ -1558,8 +1661,7 @@ async function debugInit() {
     // 友だち追加必須化したので特に何もしない
   }
 
-    // 初期表示
-    loadCurrentMonth();
+    // 初期表示は LIFF 初期化完了後に startAppIfReady() から実行
   </script>
 </body>
 </html>
