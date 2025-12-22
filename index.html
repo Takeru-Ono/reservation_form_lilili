@@ -464,7 +464,8 @@
   ></script>
 
 <script>
-  const LIFF_ID = "2008710277-rUcZlfIr";
+  // リッチメニューのリンク（https://liff.line.me/...）の末尾と同じ LIFF ID を設定する
+  const LIFF_ID = "2008710277-M0fwyTiO";
 
   function loginOnce(reason) {
   const key = "login_attempted";
@@ -636,6 +637,8 @@ async function debugInit() {
   try {
     pushDebug("manual init start");
     pushDebug("typeof liff=" + (typeof window.liff));
+    pushDebug("LIFF_ID=" + LIFF_ID);
+    pushDebug("href=" + location.href);
     if (!window.liff) {
       pushDebug("liff is undefined -> SDK not loaded");
       return;

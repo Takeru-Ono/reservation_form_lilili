@@ -198,10 +198,15 @@ function reserve(data) {
   }
 
   Logger.log(
-    "[reserve] lineUserId=" + (data.lineUserId || "null") + " email=" + data.email
+    "[reserve] lineUserId=" +
+      (data.lineUserId || "null") +
+      " email=" +
+      data.email
   );
   if (!data.lineUserId) {
-    throw new Error("LINEアプリから開き直してください（ユーザーIDが取得できていません）");
+    throw new Error(
+      "LINEアプリから開き直してください（ユーザーIDが取得できていません）"
+    );
   }
 
   const cal = CalendarApp.getCalendarById(CONFIG.CALENDAR_ID);
