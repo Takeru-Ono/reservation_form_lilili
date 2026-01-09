@@ -743,6 +743,30 @@ function startAppIfReady() {
       return WEEKDAYS[d.getDay()];
     }
 
+    function startOfWeekMonday(date) {
+      const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const diff = (d.getDay() + 6) % 7; // Monday=0
+      d.setDate(d.getDate() - diff);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    function isWeekendClosedForThisWeek(dateObj, now) {
+      const day = dateObj.getDay();
+      if (day !== 0 && day !== 6) return false;
+
+      const weekStart = startOfWeekMonday(now);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+
+      if (dateObj < weekStart || dateObj > weekEnd) return false;
+
+      const cutoff = new Date(weekStart);
+      cutoff.setDate(cutoff.getDate() + 4); // Friday
+      cutoff.setHours(12, 0, 0, 0);
+      return now >= cutoff;
+    }
+
     // 選択状態
     let currentSelectedDate = null;
     let selectedSlots = [];
@@ -839,10 +863,11 @@ function startAppIfReady() {
       const label = document.getElementById("currentMonthLabel");
       const datesDiv = document.getElementById("dates");
 
+      const now = new Date();
       label.textContent = formatMonthLabel(currentMonth);
       datesDiv.innerHTML = "";
 
-      const today = new Date();
+      const today = new Date(now);
       today.setHours(0, 0, 0, 0);
 
       list.forEach(item => {
@@ -854,11 +879,12 @@ function startAppIfReady() {
         const weekdayLabel = WEEKDAYS[weekdayIndex];
         const status = item.status || "◎";
         const isPast = dateObj < today;
+        const isClosedWeekend = isWeekendClosedForThisWeek(dateObj, now);
 
         const e = document.createElement("div");
         e.className = "date-item";
 
-        if (isPast || status === "×") {
+        if (isPast || status === "×" || isClosedWeekend) {
           e.classList.add("disabled");
         } else {
           e.onclick = () => loadSlots(dateStr);

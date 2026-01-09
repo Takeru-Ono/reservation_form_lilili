@@ -19,8 +19,12 @@ const CONFIG = {
   LINE_ACCESS_TOKEN: PROPS.getProperty("LINE_ACCESS_TOKEN"),
   LINE_BASIC_ID: PROPS.getProperty("LINE_BASIC_ID"),
   LINE_CHANNEL_ID: PROPS.getProperty("LINE_CHANNEL_ID"),
+  LINE_TOMORROW_IMAGE_URL: PROPS.getProperty("LINE_TOMORROW_IMAGE_URL"),
   // MODE: "prod",
 };
+
+const DEFAULT_TOMORROW_IMAGE_URL =
+  "https://drive.google.com/uc?export=download&id=1seAqik--NCcM5FPmMVSlhNmT6tEhU_0-";
 
 // テスト用設定（必要に応じて CONFIG と差し替えて利用）
 // const CONFIG_TEST = {
@@ -301,6 +305,28 @@ function reserve(data) {
     });
   }
 
+  // 予約完了メッセージをLINEへ送信
+  try {
+    const minStart = slots.reduce(
+      (min, s) => (s.start < min ? s.start : min),
+      slots[0].start
+    );
+    const maxEnd = slots.reduce(
+      (max, s) => (s.end > max ? s.end : max),
+      slots[0].end
+    );
+    const message = buildReservationThanksMessage_({
+      start: minStart,
+      end: maxEnd,
+      name: data.name,
+      peopleCount,
+      purpose,
+    });
+    sendLineMessage_(lineUserId, message);
+  } catch (err) {
+    Logger.log("LINE send (reservation) failed: " + err);
+  }
+
   // フロントにトークンを返す
   return { ok: true, token: token };
 }
@@ -454,6 +480,32 @@ function buildFreeSlotsForDateFromEvents_(d, eventsForDay) {
 
   return result;
 }
+
+function buildReservationThanksMessage_(info) {
+  const dateStr = Utilities.formatDate(
+    info.start,
+    CONFIG.TIMEZONE,
+    "yyyy/MM/dd（E）"
+  );
+  const startStr = Utilities.formatDate(info.start, CONFIG.TIMEZONE, "HH:mm");
+  const endStr = Utilities.formatDate(info.end, CONFIG.TIMEZONE, "HH:mm");
+
+  return (
+    "ご予約ありがとうございます！\n" +
+    "以下の内容でご予約を承りました！\n\n" +
+    "【予約内容】\n" +
+    `日付：${dateStr}\n` +
+    `時間：${startStr} - ${endStr}\n` +
+    (info.name ? `お名前：${info.name}\n` : "") +
+    (info.peopleCount ? `利用人数：${info.peopleCount}人\n` : "") +
+    (info.purpose ? `利用目的：${info.purpose}\n` : "") +
+    "\n" +
+    "※ご利用日の2週間前以降のキャンセルはできません（キャンセル料100%）。\n" +
+    "キャンセルなどの連絡はこちらの公式LINEにお願いいたします。\n\n" +
+    "このLINEに当日のご案内をお送りします。\n" +
+    "※ご利用日前日10時ごろにお送りする予定です。"
+  );
+}
 // =========================
 // LINE Webhook 入口
 // =========================
@@ -510,7 +562,10 @@ function handleApiAction_(req) {
   const verifyResult = verifyLineAccessToken_(accessToken);
   const profile = fetchLineProfileFromToken_(accessToken);
   const userId =
-    (profile && profile.userId) || payload.lineUserId || verifyResult.sub || null;
+    (profile && profile.userId) ||
+    payload.lineUserId ||
+    verifyResult.sub ||
+    null;
 
   let result;
   switch (action) {
@@ -889,30 +944,49 @@ function sendKeysForTomorrow() {
     const startStr = Utilities.formatDate(minStart, CONFIG.TIMEZONE, "HH:mm");
     const endStr = Utilities.formatDate(maxEnd, CONFIG.TIMEZONE, "HH:mm");
 
-    const message =
-      "明日のご利用ありがとうございます。\n\n" +
-      "【予約内容】\n" +
-      `日付：${dateStr}\n` +
-      `時間：${startStr} - ${endStr}\n` +
-      (name ? `お名前：${name}\n` : "") +
-      (peopleCount ? `利用人数：${peopleCount}人\n` : "") +
-      (purpose ? `利用目的：${purpose}\n` : "") +
-      "\n" +
-      "【当日のご案内】\n" +
-      "・Wi-Fi SSID: AiR-WiFi_0V49GH / パスワード: 55200973\n" +
-      "・入口横のポストにある封筒に a.利用者名 b.利用日時 c.金額 を記載し、お釣りのないよう現金を入れて投函してください。\n" +
-      "・ご利用内容の確認と入退室の流れについて、事前にこのメッセージを保管しておいてください。\n\n" +
-      "※ご利用日の2週間前以降のキャンセルはできません（キャンセル料100%）。\n" +
-      "何かございましたら公式LINEにご連絡ください。\n" +
-      "ご利用後は、このトークに片付け後の写真を送信してください。";
+    const message = buildTomorrowGuideMessage_({
+      dateStr,
+      startStr,
+      endStr,
+      name,
+      peopleCount,
+      purpose,
+    });
 
-    sendLineMessage_(userId, message);
+    const imageUrl =
+      CONFIG.LINE_TOMORROW_IMAGE_URL || DEFAULT_TOMORROW_IMAGE_URL;
+    if (imageUrl) {
+      sendLineMessageWithImage_(userId, message, imageUrl);
+    } else {
+      sendLineMessage_(userId, message);
+    }
 
     // 鍵送信済みフラグをセット
     rows.forEach((info) => {
       sheet.getRange(info.index, 14).setValue(new Date()); // key_sent_at
     });
   });
+}
+
+function buildTomorrowGuideMessage_(info) {
+  return (
+    "明日のご利用ありがとうございます。\n\n" +
+    "【予約内容】\n" +
+    `日付：${info.dateStr}\n` +
+    `時間：${info.startStr} - ${info.endStr}\n` +
+    (info.name ? `お名前：${info.name}\n` : "") +
+    (info.peopleCount ? `利用人数：${info.peopleCount}人\n` : "") +
+    (info.purpose ? `利用目的：${info.purpose}\n` : "") +
+    "\n" +
+    "【当日のご案内】\n" +
+    "・Wi-Fi SSID: AiR-WiFi_0V49GH\n" +
+    "・パスワード: 55200973\n" +
+    "・入口横のポストにある封筒に a.利用者名 b.利用日時 c.金額 を記載し、お釣りのないよう現金を入れて投函してください。\n" +
+    "・ご利用内容の確認と入退室の流れについて、事前にこのメッセージを保管しておいてください。\n\n" +
+    "※ご利用日の2週間前以降のキャンセルはできません（キャンセル料100%）。\n" +
+    "何かございましたら公式LINEにご連絡ください。\n" +
+    "ご利用後は、このトークに片付け後の写真を送信してください。"
+  );
 }
 
 // LINE への push メッセージ送信
@@ -925,6 +999,45 @@ function sendLineMessage_(userId, text) {
   const payload = {
     to: userId,
     messages: [{ type: "text", text: text }],
+  };
+
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    headers: {
+      Authorization: "Bearer " + CONFIG.LINE_ACCESS_TOKEN,
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  };
+
+  const res = UrlFetchApp.fetch(url, options);
+  Logger.log(
+    "LINE push response: " + res.getResponseCode() + " " + res.getContentText()
+  );
+}
+
+function sendLineMessageWithImage_(userId, text, imageUrl) {
+  if (!CONFIG.LINE_ACCESS_TOKEN) {
+    Logger.log("LINE_ACCESS_TOKEN が設定されていません。");
+    return;
+  }
+  if (!imageUrl) {
+    sendLineMessage_(userId, text);
+    return;
+  }
+
+  const url = "https://api.line.me/v2/bot/message/push";
+  const payload = {
+    to: userId,
+    messages: [
+      { type: "text", text: text },
+      {
+        type: "image",
+        originalContentUrl: imageUrl,
+        previewImageUrl: imageUrl,
+      },
+    ],
   };
 
   const options = {
@@ -1010,9 +1123,8 @@ function fetchLineProfileFromToken_(accessToken) {
 
   return json;
 }
-
+const userId = "U74cf7d95f49d19c7aa6eabe4460df835";
 function pushTest() {
-  const userId = "U68a910db5be118849f479d4a8ed57351";
   const token = CONFIG.LINE_ACCESS_TOKEN; // Messaging API設定で発行したやつ
 
   UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push", {
@@ -1026,6 +1138,53 @@ function pushTest() {
       ],
     }),
   });
+}
+
+function sendReservationThanksTest(U74cf7d95f49d19c7aa6eabe4460df835) {
+  if (!userId) {
+    throw new Error("userId is required");
+  }
+
+  const start = new Date(2025, 11, 21, 9, 0, 0, 0);
+  const end = new Date(2025, 11, 21, 11, 0, 0, 0);
+
+  const message = buildReservationThanksMessage_({
+    start: start,
+    end: end,
+    name: "大野　尊",
+    peopleCount: 5,
+    purpose: "テスト",
+  });
+
+  sendLineMessage_(userId, message);
+}
+
+function sendTomorrowGuideTest(userId) {
+  if (!userId) {
+    throw new Error("userId is required");
+  }
+
+  const start = new Date(2025, 11, 21, 9, 0, 0, 0);
+  const end = new Date(2025, 11, 21, 11, 0, 0, 0);
+  const dateStr = Utilities.formatDate(
+    start,
+    CONFIG.TIMEZONE,
+    "yyyy/MM/dd（E）"
+  );
+  const startStr = Utilities.formatDate(start, CONFIG.TIMEZONE, "HH:mm");
+  const endStr = Utilities.formatDate(end, CONFIG.TIMEZONE, "HH:mm");
+
+  const message = buildTomorrowGuideMessage_({
+    dateStr,
+    startStr,
+    endStr,
+    name: "大野　尊",
+    peopleCount: 5,
+    purpose: "テスト",
+  });
+
+  const imageUrl = CONFIG.LINE_TOMORROW_IMAGE_URL || DEFAULT_TOMORROW_IMAGE_URL;
+  sendLineMessageWithImage_(userId, message, imageUrl);
 }
 
 function debugCalendar() {
