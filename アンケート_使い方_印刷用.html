@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>アンケート運用ガイド</title>
+    <style>
+      :root {
+        --bg: #f3efe7;
+        --paper: #fffdf8;
+        --ink: #1f2937;
+        --muted: #5b6472;
+        --accent: #14532d;
+        --accent-2: #7c2d12;
+        --line: #d6d3cc;
+        --soft: #f7f2ea;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(20, 83, 45, 0.08), transparent 25%),
+          radial-gradient(circle at top right, rgba(124, 45, 18, 0.08), transparent 22%),
+          linear-gradient(180deg, var(--bg), #efe8dc);
+        font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+      }
+      .page {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 28px 18px 40px;
+      }
+      .sheet {
+        background: var(--paper);
+        border: 1px solid rgba(31, 41, 55, 0.08);
+        border-radius: 24px;
+        box-shadow: 0 24px 60px rgba(31, 41, 55, 0.12);
+        padding: 28px;
+      }
+      .hero {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 22px;
+        padding-bottom: 18px;
+        border-bottom: 2px solid var(--line);
+      }
+      .eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(28px, 4vw, 42px);
+        line-height: 1.1;
+      }
+      .sub {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.75;
+        max-width: 76ch;
+      }
+      .note {
+        background: var(--soft);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px 16px;
+        line-height: 1.75;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        margin: 18px 0 22px;
+      }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px;
+        background: #fff;
+      }
+      .card h2, .card h3 {
+        margin: 0 0 10px;
+        font-size: 18px;
+      }
+      .card h3 {
+        margin-top: 18px;
+        font-size: 15px;
+        color: var(--accent-2);
+      }
+      .meta {
+        display: grid;
+        gap: 8px;
+        margin: 10px 0 0;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(247, 242, 234, 0.6);
+      }
+      .k {
+        font-weight: 700;
+        color: #374151;
+      }
+      .v {
+        color: #111827;
+        word-break: break-all;
+      }
+      .v.placeholder {
+        color: #9ca3af;
+        font-style: italic;
+      }
+      .steps {
+        margin: 0;
+        padding-left: 20px;
+        line-height: 1.8;
+      }
+      .steps li { margin: 4px 0; }
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 13px;
+      }
+      .table th, .table td {
+        border: 1px solid var(--line);
+        padding: 10px 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+      .table th {
+        background: #f8fafc;
+        font-size: 12px;
+        color: #374151;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: #ecfdf5;
+        color: #166534;
+        margin-right: 6px;
+        margin-bottom: 6px;
+      }
+      .tag.alt {
+        background: #fff7ed;
+        color: #9a3412;
+      }
+      .tag.gray {
+        background: #f3f4f6;
+        color: #4b5563;
+      }
+      .callout {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-left: 4px solid var(--accent);
+        background: #f8fafc;
+        line-height: 1.75;
+      }
+      .linkline {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .linkbox {
+        padding: 12px 14px;
+        border: 1px dashed var(--line);
+        border-radius: 12px;
+        background: #fff;
+        word-break: normal;
+        overflow-wrap: anywhere;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 12px;
+      }
+      .linkbox a {
+        color: inherit;
+        text-decoration: underline;
+      }
+      .section {
+        margin-top: 20px;
+      }
+      .section h2 {
+        margin: 0 0 10px;
+        font-size: 20px;
+      }
+      .small {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      .footer {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+      .page-break {
+        break-before: page;
+        page-break-before: always;
+      }
+      @media print {
+        body { background: #fff; }
+        .page { padding: 0; max-width: none; }
+        .sheet {
+          box-shadow: none;
+          border: none;
+          border-radius: 0;
+          padding: 0;
+        }
+        .card { break-inside: avoid; }
+        .page-break { break-before: page; page-break-before: always; }
+        a { color: inherit; text-decoration: none; }
+      }
+      @media (max-width: 760px) {
+        .grid { grid-template-columns: 1fr; }
+        .kv { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="sheet">
+        <div class="hero">
+          <div class="eyebrow">QUESTIONNAIRE GUIDE</div>
+          <h1>アンケート使い方</h1>
+          <p class="sub">
+            高校生版と大学生版の使い方、リンク、確認ポイントをまとめています。
+          </p>
+        </div>
+
+        <div class="grid">
+          <section class="card">
+            <h2>高校生アンケート</h2>
+            <span class="tag">Google フォーム運用</span>
+            <span class="tag gray">高校生用</span>
+
+            <div class="section">
+              <h3>概要</h3>
+              <p class="small">
+                高校生向けのアンケートは、Google フォームを使って回答を受け付ける想定です。
+                回答はスプレッドシートに記録され、質問は4日ごとに切り替わります。
+              </p>
+            </div>
+
+            <div class="section">
+              <h3>リンク</h3>
+              <div class="linkline">
+                <div class="linkbox">【高校生質問フォーム】 <a href="https://docs.google.com/forms/d/e/1FAIpQLScRE79oIZdHKov2RKKMpUod1tv2A7VViW2dLkHhqRDj30q3SQ/viewform">https://docs.google.com/forms/d/e/1FAIpQLScRE79oIZdHKov2RKKMpUod1tv2A7VViW2dLkHhqRDj30q3SQ/viewform</a></div>
+                <div class="linkbox">【高校生スプレッドシート】 <a href="https://docs.google.com/spreadsheets/d/1zM7ECyx-mqvbb9w6EIoCYsVssi5mIg_chcYB-qBTObc/edit?gid=263658583#gid=263658583">https://docs.google.com/spreadsheets/d/1zM7ECyx-mqvbb9w6EIoCYsVssi5mIg_chcYB-qBTObc/edit?gid=263658583#gid=263658583</a></div>
+              </div>
+            </div>
+
+            <div class="section">
+              <h3>運用手順</h3>
+              <ol class="steps">
+                <li>高校生用フォームの URL を案内する。</li>
+                <li>回答はスプレッドシートへ自動記録される。</li>
+                <li>4日ごとのトリガーで質問が切り替わる。</li>
+                <li>必要なら更新関数を手動で実行する。</li>
+              </ol>
+            </div>
+
+            <div class="section">
+              <h3>確認ポイント</h3>
+              <ul class="steps">
+                <li>入力欄のラベルは「名前」</li>
+                <li>回答先は高校生スプレッドシート</li>
+                <li>質問は4日ごとに更新される</li>
+                <li>日付ごとに回答シートが作られる</li>
+              </ul>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>大学生アンケート</h2>
+            <span class="tag alt">HTML Web アプリ運用</span>
+            <span class="tag gray">大学生用</span>
+
+            <div class="section">
+              <h3>概要</h3>
+              <p class="small">
+                大学生版は Web アプリで運用し、授業前と授業後で URL を分けます。
+                管理画面で授業回を作成すると、学生ごとに質問セットが作られます。
+                同じ学生IDには同じ小問が重複しないようにしています。
+              </p>
+            </div>
+
+            <div class="section">
+              <h3>リンク</h3>
+              <div class="linkline">
+                <div class="linkbox">【大学生管理画面】 <a href="https://script.google.com/macros/s/AKfycbyMPGPIwFpIJOWOAsfl88bfdLI0eHskx0I7aHITC2njjynGwXF7-TvnojgZTbdOVAg7nw/exec?page=admin">https://script.google.com/macros/s/AKfycbyMPGPIwFpIJOWOAsfl88bfdLI0eHskx0I7aHITC2njjynGwXF7-TvnojgZTbdOVAg7nw/exec?page=admin</a></div>
+                <div class="linkbox">【大学生スプレッドシート】 <a href="https://docs.google.com/spreadsheets/d/1BehqLRtWNl4J3hJw3L9lpRiHdTc_ukEiqtR1nkKgW1E/edit?gid=897227944#gid=897227944">https://docs.google.com/spreadsheets/d/1BehqLRtWNl4J3hJw3L9lpRiHdTc_ukEiqtR1nkKgW1E/edit?gid=897227944#gid=897227944</a></div>
+              </div>
+            </div>
+
+            <div class="section">
+              <h3>管理画面の使い方</h3>
+              <ol class="steps">
+                <li>管理画面を開く。</li>
+                <li>授業名と実施日を入れて授業回を作成する。</li>
+                <li>表示される pre / post の URL を対象者に配布する。</li>
+                <li>回答後、管理画面で集計と比較を確認する。</li>
+              </ol>
+            </div>
+
+            <div class="section">
+              <h3>確認できること</h3>
+              <ul class="steps">
+                <li>授業前後の合計点の変化</li>
+                <li>項目ごとの増減</li>
+                <li>学生ごとの前後比較</li>
+                <li>同じ学生IDに同じ小問を出さない制御</li>
+              </ul>
+            </div>
+          </section>
+        </div>
+
+        <section class="card section">
+          <h2>シート一覧と役割</h2>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>シート名</th>
+                <th>役割</th>
+                <th>補足</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>sessions</td>
+                <td>授業回の管理</td>
+                <td>pre / post のURLと質問セットIDを保持</td>
+              </tr>
+              <tr>
+                <td>question_sets</td>
+                <td>質問セットの保存</td>
+                <td>各学生IDごとの出題内容をJSONで保持</td>
+              </tr>
+              <tr>
+                <td>responses</td>
+                <td>回答ログ</td>
+                <td>合計点、項目点、質問文を保存</td>
+              </tr>
+              <tr>
+                <td>質問ログ_大学生</td>
+                <td>質問切り替えの記録</td>
+                <td>その時点で選ばれた小問の履歴</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <div class="footer">
+          高校生版は Google フォーム運用、大学生版は Web アプリ運用です。<br />
+          必要なリンクや注意書きがあれば、このファイルに追記してください。
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

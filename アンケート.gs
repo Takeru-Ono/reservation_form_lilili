@@ -17,10 +17,6 @@ const CONFIG = {
     "とてもそう思う",
   ],
   useStarOnly: true,
-
-  // 追加
-  sourceFormId: "1DcvAHTugxkivJWZCFPvcFy2DgndITXhUEeDqhWOOHio",
-  nameQuestionTitle: "おなまえ",
 };
 
 /***************
@@ -41,13 +37,8 @@ function setupNewForm() {
   const form = FormApp.create(CONFIG.formTitle);
   form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
 
-  // Q1: 名前（ラジオボタン）
-  const nameChoices = getNameChoices_();
-  const nameItem = form
-    .addMultipleChoiceItem()
-    .setTitle("名前")
-    .setChoiceValues(nameChoices)
-    .setRequired(true);
+  // Q1: 名前（自由入力）
+  form.addTextItem().setTitle("名前").setRequired(true);
 
   // Q2-5: 固定タイトルの評価項目
   CONFIG.fixedQuestionTitles.forEach((title) => {
@@ -76,14 +67,44 @@ function refreshDailyQuestions() {
 
   // フォームの質問（Q2-5）にヘルプテキストで質問文を入れる
   const mcItems = form.getItems(FormApp.ItemType.MULTIPLE_CHOICE);
-  if (mcItems.length < 5)
+  Logger.log(
+    "[refreshDailyQuestions] formId=" +
+      form.getId() +
+      " title=" +
+      form.getTitle() +
+      " multipleChoiceCount=" +
+      mcItems.length,
+  );
+  mcItems.forEach((item, index) => {
+    try {
+      const mc = item.asMultipleChoiceItem();
+      Logger.log(
+        "[refreshDailyQuestions] item#" +
+          index +
+          " title=" +
+          mc.getTitle() +
+          " help=" +
+          mc.getHelpText(),
+      );
+    } catch (err) {
+      Logger.log(
+        "[refreshDailyQuestions] item#" +
+          index +
+          " type=" +
+          item.getType() +
+          " title=" +
+          item.getTitle(),
+      );
+    }
+  });
+  if (mcItems.length < 4)
     throw new Error(
-      "フォームに質問が5つありません。setupNewForm を実行してください。"
+      "フォームに評価用質問が4つありません。setupNewForm を実行してください。",
     );
 
-  // 2〜5番目のみ書き換え
+  // 評価用4問を書き換え
   selected.forEach((q, i) => {
-    mcItems[i + 1]
+    mcItems[i]
       .asMultipleChoiceItem()
       .setTitle(CONFIG.fixedQuestionTitles[i]) // タイトル固定で列を変えない
       .setChoiceValues(CONFIG.scaleChoices)
@@ -119,7 +140,7 @@ function refreshDailyQuestions() {
   // 現在の質問をプロパティにも保存（onFormSubmit用）
   PropertiesService.getScriptProperties().setProperty(
     "TODAY_QUESTIONS",
-    JSON.stringify(selected)
+    JSON.stringify(selected),
   );
 }
 
@@ -128,12 +149,12 @@ function refreshDailyQuestions() {
  ***************/
 function onFormSubmit(e) {
   const namedValues = e.namedValues;
-  const name = (namedValues["おなまえ"] || [""])[0].trim();
+  const name = getHighSchoolSubmittedName_(namedValues);
   if (!name) return;
 
   const todayQuestions = JSON.parse(
     PropertiesService.getScriptProperties().getProperty("TODAY_QUESTIONS") ||
-      "[]"
+      "[]",
   );
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const personSheet = ss.getSheetByName(name) || ss.insertSheet(name);
@@ -184,13 +205,13 @@ function pickDailyQuestions_() {
   const sheet = bankSS.getSheetByName(CONFIG.questionBankSheetName);
   if (!sheet)
     throw new Error(
-      "質問集シートが見つかりません: " + CONFIG.questionBankSheetName
+      "質問集シートが見つかりません: " + CONFIG.questionBankSheetName,
     );
 
   const lastRow = sheet.getLastRow();
   if (lastRow < 3)
     throw new Error(
-      "質問集のデータが不足しています（A3以降に質問が必要です）。"
+      "質問集のデータが不足しています（A3以降に質問が必要です）。",
     );
 
   // A3から最終行まで
@@ -224,44 +245,97 @@ function pickDailyQuestions_() {
 }
 
 /***************
- * Helper: 名前一覧取得
- ***************/
-function getNameChoices_() {
-  const sourceForm = FormApp.openById(CONFIG.sourceFormId);
-  const items = sourceForm.getItems();
-
-  for (const item of items) {
-    if (item.getTitle() !== CONFIG.nameQuestionTitle) continue;
-
-    const type = item.getType();
-    if (type === FormApp.ItemType.MULTIPLE_CHOICE) {
-      return item
-        .asMultipleChoiceItem()
-        .getChoices()
-        .map((c) => c.getValue());
-    }
-    if (type === FormApp.ItemType.LIST) {
-      return item
-        .asListItem()
-        .getChoices()
-        .map((c) => c.getValue());
-    }
-    throw new Error(
-      "おなまえの質問が選択式ではありません。ラジオまたはプルダウンにしてください。"
-    );
-  }
-
-  throw new Error("既存フォームに「おなまえ」質問が見つかりません。");
-}
-
-/***************
  * Helper: フォーム取得
  ***************/
 function getForm_() {
   const formId = PropertiesService.getScriptProperties().getProperty("FORM_ID");
   if (!formId)
     throw new Error(
-      "フォームIDが未設定です。setupNewForm を実行してください。"
+      "フォームIDが未設定です。setupNewForm を実行してください。",
     );
   return FormApp.openById(formId);
+}
+
+function getHighSchoolSubmittedName_(namedValues) {
+  const keys = ["名前", "入力", "おなまえ", "name"];
+  for (const key of keys) {
+    const value = (namedValues && namedValues[key] ? namedValues[key] : [""])[0];
+    const trimmed = String(value || "").trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
+}
+
+/***************
+ * Debug: 現在のフォーム状態をログに出す
+ ***************/
+function debugFormState() {
+  const formId = PropertiesService.getScriptProperties().getProperty("FORM_ID");
+  if (!formId) {
+    Logger.log("[debugFormState] FORM_ID が未設定です");
+    return;
+  }
+
+  const form = FormApp.openById(formId);
+  const items = form.getItems();
+
+  Logger.log("[debugFormState] FORM_ID=" + formId);
+  Logger.log("[debugFormState] formTitle=" + form.getTitle());
+  Logger.log("[debugFormState] itemCount=" + items.length);
+
+  items.forEach((item, index) => {
+    Logger.log(
+      "[debugFormState] #" +
+        index +
+        " type=" +
+        item.getType() +
+        " title=" +
+        item.getTitle(),
+    );
+  });
+}
+
+/***************
+ * Debug: 質問バンク側の候補を確認する
+ ***************/
+function debugQuestionBankState() {
+  const bankSS = SpreadsheetApp.openById(CONFIG.questionBankSpreadsheetId);
+  const sheet = bankSS.getSheetByName(CONFIG.questionBankSheetName);
+  if (!sheet) {
+    Logger.log(
+      "[debugQuestionBankState] 質問集シートが見つかりません: " +
+        CONFIG.questionBankSheetName,
+    );
+    return;
+  }
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  Logger.log(
+    "[debugQuestionBankState] sheet=" +
+      sheet.getName() +
+      " lastRow=" +
+      lastRow +
+      " lastCol=" +
+      lastCol,
+  );
+
+  const data = sheet
+    .getRange(3, 1, Math.max(0, lastRow - 2), lastCol)
+    .getValues();
+  CONFIG.categories.forEach((cat) => {
+    const candidates = data.filter((r) => {
+      const category = r[1];
+      const text = r[3];
+      if (category !== cat) return false;
+      if (CONFIG.useStarOnly && String(text).indexOf("★") === -1) return false;
+      return true;
+    });
+    Logger.log(
+      "[debugQuestionBankState] category=" +
+        cat +
+        " candidates=" +
+        candidates.length,
+    );
+  });
 }

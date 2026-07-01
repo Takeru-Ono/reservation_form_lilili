@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>大学生アンケート</title>
+    <style>
+      :root {
+        --bg: #f6f1e8;
+        --panel: rgba(255, 255, 255, 0.88);
+        --ink: #1f2937;
+        --muted: #6b7280;
+        --accent: #1f6f8b;
+        --accent-2: #d97706;
+        --border: rgba(31, 41, 55, 0.12);
+        --shadow: 0 20px 60px rgba(31, 41, 55, 0.14);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(31,111,139,.18), transparent 30%),
+          radial-gradient(circle at top right, rgba(217,119,6,.14), transparent 24%),
+          linear-gradient(180deg, #fffaf2 0%, var(--bg) 100%);
+      }
+      .wrap {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 28px 18px 40px;
+      }
+      .hero {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+      .eyebrow {
+        color: var(--accent);
+        font-weight: 700;
+        letter-spacing: .08em;
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(28px, 4vw, 42px);
+        line-height: 1.08;
+      }
+      .sub {
+        margin: 0;
+        color: var(--muted);
+        max-width: 62ch;
+        line-height: 1.7;
+      }
+      .panel {
+        background: var(--panel);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+        padding: 20px;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(31,111,139,.1);
+        color: var(--accent);
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .pill.alt { background: rgba(217,119,6,.12); color: #b45309; }
+      .field-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+      .field label {
+        font-size: 13px;
+        font-weight: 700;
+        color: #374151;
+      }
+      input[type="text"] {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 13px 14px;
+        font: inherit;
+        background: white;
+        outline: none;
+      }
+      input[type="text"]:focus {
+        border-color: rgba(31,111,139,.45);
+        box-shadow: 0 0 0 4px rgba(31,111,139,.12);
+      }
+      .question {
+        border-top: 1px solid var(--border);
+        padding-top: 18px;
+        margin-top: 18px;
+      }
+      .question h2 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+      .question p {
+        margin: 0 0 12px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      .choices {
+        display: grid;
+        gap: 10px;
+      }
+      .choice {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 12px 14px;
+        background: white;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .choice input { transform: scale(1.1); }
+      .choice span { line-height: 1.5; }
+      .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 22px;
+        flex-wrap: wrap;
+      }
+      button {
+        border: 0;
+        border-radius: 14px;
+        padding: 13px 18px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .primary {
+        color: white;
+        background: linear-gradient(135deg, var(--accent), #0f4c5c);
+        box-shadow: 0 14px 30px rgba(31,111,139,.22);
+      }
+      .ghost {
+        background: #fff;
+        color: var(--ink);
+        border: 1px solid var(--border);
+      }
+      .status {
+        margin-top: 16px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .status.error { color: #b91c1c; }
+      .status.ok { color: #166534; }
+      .hidden { display: none !important; }
+      @media (max-width: 700px) {
+        .field-grid { grid-template-columns: 1fr; }
+        .panel { padding: 16px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="hero">
+        <div class="eyebrow">University survey</div>
+        <h1>授業前後の自己評価アンケート</h1>
+        <p class="sub">
+          名前・学生IDを入力し、授業前または授業後の回答を送信してください。
+        </p>
+      </div>
+
+      <div class="panel" id="errorPanel">
+        <strong>読み込み中です。</strong>
+        <div class="status" id="errorText">URLの session と phase を確認しています。</div>
+      </div>
+
+      <form class="panel" id="surveyForm">
+        <div class="meta">
+          <div class="pill" id="sessionPill"></div>
+          <div class="pill alt" id="phasePill"></div>
+        </div>
+
+        <div class="field-grid">
+          <div class="field">
+            <label for="name">名前</label>
+            <input id="name" type="text" placeholder="例: 山田花子" required />
+          </div>
+          <div class="field">
+            <label for="studentId">学生ID</label>
+            <input id="studentId" type="text" placeholder="例: 1234567" required />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="primary" type="button" id="loadBtn">質問を読み込む</button>
+          <button class="ghost" type="button" id="reloadBtn">再読み込み</button>
+        </div>
+
+        <div id="questionArea"></div>
+
+        <div class="actions">
+          <button class="primary" type="submit" id="submitBtn" disabled>送信する</button>
+        </div>
+
+        <div class="status" id="formStatus"></div>
+      </form>
+
+      <div class="panel hidden" id="thanksPanel">
+        <strong>回答ありがとうございました。</strong>
+        <div class="status ok">送信は完了しています。画面を閉じてください。</div>
+      </div>
+    </div>
+
+    <script>
+      const BOOTSTRAP = <?!= JSON.stringify(debugInfo) ?>;
+      const INITIAL = <?!= JSON.stringify(initialParams) ?>;
+      const qs = new URLSearchParams(window.location.search);
+      const sessionId = (INITIAL && INITIAL.sessionId) || qs.get("session") || "";
+      const phase = ((INITIAL && INITIAL.phase) || qs.get("phase") || "pre").toLowerCase();
+      const form = document.getElementById("surveyForm");
+      const loadBtn = document.getElementById("loadBtn");
+      const submitBtn = document.getElementById("submitBtn");
+      const errorPanel = document.getElementById("errorPanel");
+      const errorText = document.getElementById("errorText");
+      const statusEl = document.getElementById("formStatus");
+      const questionArea = document.getElementById("questionArea");
+      const thanksPanel = document.getElementById("thanksPanel");
+      const phaseLabel = phase === "post" ? "授業後" : "授業前";
+      let currentRespondentKey = "";
+      let currentQuestionSetId = "";
+      let isSubmitting = false;
+
+      document.getElementById("reloadBtn").addEventListener("click", () => {
+        window.location.reload();
+      });
+      loadBtn.addEventListener("click", loadQuestions);
+
+      if (!sessionId) {
+        errorText.textContent = "URLに session がありません。管理画面で発行したリンクを使ってください。";
+      } else {
+        document.getElementById("sessionPill").textContent = `session: ${sessionId}`;
+        document.getElementById("phasePill").textContent = phaseLabel;
+        errorText.textContent = "学生IDを入力して、質問を読み込んでください。";
+        submitBtn.disabled = true;
+      }
+
+      function getRespondentKey() {
+        const studentId = document.getElementById("studentId").value.trim();
+        return studentId.toLowerCase();
+      }
+
+      function loadQuestions() {
+        const respondentKey = getRespondentKey();
+        if (!sessionId) {
+          errorText.textContent = "URLに session がありません。管理画面で発行したリンクを使ってください。";
+          return;
+        }
+        if (!respondentKey) {
+          errorText.textContent = "学生IDを入力してください。";
+          return;
+        }
+
+        currentRespondentKey = respondentKey;
+        currentQuestionSetId = "";
+        submitBtn.disabled = true;
+        statusEl.className = "status";
+        statusEl.textContent = "質問を読み込み中です...";
+
+        google.script.run
+          .withSuccessHandler((data) => {
+            console.log("[survey] getUniversitySurveyData result:", data);
+            if (data === null) {
+              errorText.textContent = "サーバから null が返りました。";
+              return;
+            }
+
+            if (!data || !data.ok) {
+              errorText.textContent = (data && data.error) || "アンケートの読み込みに失敗しました。";
+              return;
+            }
+
+            currentQuestionSetId = data.questionSet && data.questionSet.setId ? data.questionSet.setId : "";
+            renderQuestions(data.questions || []);
+            errorPanel.classList.add("hidden");
+            submitBtn.disabled = false;
+            statusEl.className = "status ok";
+            statusEl.textContent = "質問を読み込みました。";
+          })
+          .withFailureHandler((err) => {
+            console.error("[survey] getUniversitySurveyData failed:", err);
+            errorText.textContent = err && err.message ? err.message : String(err);
+          })
+          .getUniversitySurveyData(sessionId, phase, respondentKey);
+      }
+
+      function renderQuestions(questions) {
+        questionArea.innerHTML = "";
+        questions.forEach((question, index) => {
+          const block = document.createElement("section");
+          block.className = "question";
+
+          const title = document.createElement("h2");
+          title.textContent = `Q${index + 1}`;
+
+          const desc = document.createElement("p");
+          desc.textContent = question && question.text ? question.text : "質問が設定されていません。";
+
+          const choices = document.createElement("div");
+          choices.className = "choices";
+          [1, 2, 3, 4, 5].forEach((value) => {
+            const label = document.createElement("label");
+            label.className = "choice";
+            label.innerHTML = `
+              <input type="radio" name="q${index + 1}" value="${value}" required />
+              <span>${value}.</span>
+            `;
+            label.querySelector("span").textContent =
+              value === 1 ? "まったくそう思わない" :
+              value === 2 ? "あまりそう思わない" :
+              value === 3 ? "ときどきそう思う" :
+              value === 4 ? "少しそう思う" :
+              "とてもそう思う";
+            choices.appendChild(label);
+          });
+
+          block.appendChild(title);
+          block.appendChild(desc);
+          block.appendChild(choices);
+          questionArea.appendChild(block);
+        });
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (isSubmitting) return;
+        const respondentKey = getRespondentKey();
+        if (!respondentKey) {
+          statusEl.className = "status error";
+          statusEl.textContent = "学生IDを入力してください。";
+          return;
+        }
+        if (!currentQuestionSetId) {
+          statusEl.className = "status error";
+          statusEl.textContent = "先に質問を読み込んでください。";
+          return;
+        }
+        if (currentRespondentKey && respondentKey !== currentRespondentKey) {
+          statusEl.className = "status error";
+          statusEl.textContent = "入力した学生IDが変わっています。もう一度質問を読み込み直してください。";
+          return;
+        }
+
+        isSubmitting = true;
+        submitBtn.disabled = true;
+        statusEl.className = "status";
+        statusEl.textContent = "送信中です...";
+
+        const answers = [1, 2, 3, 4].map((index) => {
+          const selected = form.querySelector(`input[name="q${index}"]:checked`);
+          return selected ? Number(selected.value) : "";
+        });
+
+        const payload = {
+          sessionId,
+          phase,
+          respondentKey,
+          questionSetId: currentQuestionSetId,
+          name: document.getElementById("name").value.trim(),
+          studentId: document.getElementById("studentId").value.trim().toLowerCase(),
+          answers,
+        };
+
+        google.script.run
+          .withSuccessHandler((result) => {
+            isSubmitting = false;
+            console.log("[survey] submit result:", result);
+            if (!result || !result.ok) {
+              submitBtn.disabled = false;
+              statusEl.className = "status error";
+              statusEl.textContent = (result && result.error) || "送信に失敗しました。";
+              return;
+            }
+            form.classList.add("hidden");
+            thanksPanel.classList.remove("hidden");
+          })
+          .withFailureHandler((err) => {
+            isSubmitting = false;
+            submitBtn.disabled = false;
+            console.error("[survey] submit failed:", err);
+            statusEl.className = "status error";
+            statusEl.textContent = err && err.message ? err.message : String(err);
+          })
+          .submitUniversitySurveyResponse(payload);
+      });
+
+      window.addEventListener("error", (event) => {
+        console.error("[survey] window error:", event.error || event.message);
+      });
+    </script>
+  </body>
+</html>

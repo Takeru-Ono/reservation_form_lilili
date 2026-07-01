@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>大学生アンケート 管理画面</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: rgba(15, 23, 42, 0.88);
+        --panel-soft: rgba(30, 41, 59, 0.85);
+        --ink: #e5e7eb;
+        --muted: #94a3b8;
+        --accent: #38bdf8;
+        --accent-2: #f59e0b;
+        --border: rgba(148, 163, 184, 0.22);
+        --shadow: 0 22px 60px rgba(0, 0, 0, 0.26);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(56,189,248,.18), transparent 28%),
+          radial-gradient(circle at top right, rgba(245,158,11,.16), transparent 20%),
+          linear-gradient(180deg, #020617 0%, #0f172a 100%);
+      }
+      .wrap { max-width: 1200px; margin: 0 auto; padding: 28px 18px 40px; }
+      .hero { display: grid; gap: 10px; margin-bottom: 18px; }
+      .eyebrow {
+        color: var(--accent);
+        font-weight: 700;
+        letter-spacing: .12em;
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+      h1 { margin: 0; font-size: clamp(28px, 4vw, 44px); }
+      .sub { margin: 0; color: var(--muted); max-width: 72ch; line-height: 1.7; }
+      .grid {
+        display: grid;
+        grid-template-columns: 1.1fr .9fr;
+        gap: 16px;
+        align-items: start;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+        padding: 18px;
+      }
+      .panel.soft { background: var(--panel-soft); }
+      .section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .section-title h2 { margin: 0; font-size: 18px; }
+      .field-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 1fr 180px;
+      }
+      .field { display: grid; gap: 6px; }
+      .field.full { grid-column: 1 / -1; }
+      label { font-size: 13px; color: #cbd5e1; font-weight: 700; }
+      input, textarea, select {
+        width: 100%;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.04);
+        color: var(--ink);
+        padding: 12px 14px;
+        font: inherit;
+        outline: none;
+      }
+      textarea { min-height: 84px; resize: vertical; }
+      input:focus, textarea:focus, select:focus {
+        border-color: rgba(56,189,248,.55);
+        box-shadow: 0 0 0 4px rgba(56,189,248,.12);
+      }
+      button {
+        border: 0;
+        border-radius: 14px;
+        padding: 12px 16px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .primary {
+        color: #08111f;
+        background: linear-gradient(135deg, #38bdf8, #7dd3fc);
+      }
+      .ghost {
+        color: var(--ink);
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border);
+      }
+      .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+      .meta { display: flex; flex-wrap: wrap; gap: 10px; }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(56,189,248,.12);
+        color: #bae6fd;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .pill.alt { background: rgba(245,158,11,.12); color: #fcd34d; }
+      .urlbox {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .urlrow {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border);
+      }
+      .urlrow code {
+        word-break: break-all;
+        color: #dbeafe;
+      }
+      .split {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .table-wrap { overflow-x: auto; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      th, td {
+        text-align: left;
+        padding: 10px 8px;
+        border-bottom: 1px solid rgba(148,163,184,.15);
+        vertical-align: top;
+      }
+      th { color: #cbd5e1; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+      .tiny { color: var(--muted); font-size: 12px; line-height: 1.6; }
+      .status { margin-top: 10px; color: var(--muted); font-size: 14px; }
+      .status.error { color: #fca5a5; }
+      .status.ok { color: #86efac; }
+      .stack { display: grid; gap: 16px; }
+      .connection {
+        margin: 0 0 16px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(255, 255, 255, 0.04);
+        color: #cbd5e1;
+        font-size: 12px;
+        line-height: 1.7;
+        white-space: pre-wrap;
+      }
+      @media (max-width: 960px) {
+        .grid, .split { grid-template-columns: 1fr; }
+        .field-grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="hero">
+        <div class="eyebrow">Admin dashboard</div>
+        <h1>大学生アンケート管理画面</h1>
+        <p class="sub">
+          授業回を作成して pre / post のURLを発行し、回答推移を確認します。各セッションの質問セットは作成時に固定されます。
+        </p>
+      </div>
+
+      <div class="grid">
+        <div class="stack">
+          <section class="panel">
+            <div class="section-title">
+              <h2>授業回の作成</h2>
+              <span class="tiny">pre / post URL をまとめて発行</span>
+            </div>
+            <div class="field-grid">
+              <div class="field full">
+                <label for="title">授業名</label>
+                <input id="title" type="text" placeholder="例: 教育心理学 第3回" />
+              </div>
+              <div class="field">
+                <label for="eventDate">実施日</label>
+                <input id="eventDate" type="date" />
+              </div>
+              <div class="field">
+                <label for="shortNote">メモ</label>
+                <input id="shortNote" type="text" placeholder="任意" />
+              </div>
+              <div class="field full">
+                <label for="note">補足</label>
+                <textarea id="note" placeholder="授業の概要や注意点"></textarea>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="primary" id="createBtn" type="button">授業回を作成</button>
+              <button class="ghost" id="refreshBtn" type="button">一覧を更新</button>
+            </div>
+            <div class="status" id="createStatus"></div>
+            <div class="urlbox hidden" id="resultBox">
+              <div class="urlrow">
+                <strong>授業回ID</strong>
+                <code id="resultSession"></code>
+              </div>
+              <div class="urlrow">
+                <strong>授業前URL</strong>
+                <code id="resultPreUrl"></code>
+                <div class="btn-row">
+                  <button class="ghost" type="button" id="copyPreBtn">コピー</button>
+                  <button class="ghost" type="button" id="openPreBtn">開く</button>
+                </div>
+              </div>
+              <div class="urlrow">
+                <strong>授業後URL</strong>
+                <code id="resultPostUrl"></code>
+                <div class="btn-row">
+                  <button class="ghost" type="button" id="copyPostBtn">コピー</button>
+                  <button class="ghost" type="button" id="openPostBtn">開く</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>推移サマリー</h2>
+              <span class="tiny">授業回ごとの pre / post 平均と差分</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>授業日</th>
+                    <th>授業名</th>
+                    <th>pre</th>
+                    <th>post</th>
+                    <th>差分</th>
+                  </tr>
+                </thead>
+                <tbody id="trendBody">
+                  <tr><td colspan="5" class="tiny">読み込み中...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <div class="stack">
+          <section class="panel soft">
+            <div class="section-title">
+              <h2>セッション詳細</h2>
+              <span class="tiny">選択した授業回の個人推移</span>
+            </div>
+            <div class="field">
+              <label for="sessionSelect">授業回</label>
+              <select id="sessionSelect"></select>
+            </div>
+            <div class="status" id="detailStatus"></div>
+            <div class="meta" id="detailMeta"></div>
+            <div class="table-wrap" style="margin-top: 14px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>学生</th>
+                    <th>pre</th>
+                    <th>post</th>
+                    <th>差分</th>
+                    <th>項目差分</th>
+                  </tr>
+                </thead>
+                <tbody id="comparisonBody">
+                  <tr><td colspan="5" class="tiny">読み込み中...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel soft">
+            <div class="section-title">
+              <h2>全体メモ</h2>
+            </div>
+            <p class="tiny">
+              1. 授業回を作成すると pre/post の回答URLが発行されます。<br />
+              2. 学生は同じ session を使って回答し、phase で pre/post を分けます。<br />
+              3. responses シートには生データが蓄積され、ここで平均と推移を確認します。
+            </p>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const INITIAL = <?!= JSON.stringify(initialParams) ?>;
+      const BOOTSTRAP = <?!= JSON.stringify(debugInfo) ?>;
+      let currentData = null;
+      const sessionSelect = document.getElementById("sessionSelect");
+      const detailStatus = document.getElementById("detailStatus");
+      const detailMeta = document.getElementById("detailMeta");
+      const trendBody = document.getElementById("trendBody");
+      const comparisonBody = document.getElementById("comparisonBody");
+      const createStatus = document.getElementById("createStatus");
+      const categoryLabels = (BOOTSTRAP.categories && BOOTSTRAP.categories.length)
+        ? BOOTSTRAP.categories
+        : (BOOTSTRAP.fixedQuestionTitles || ["Q1", "Q2", "Q3", "Q4"]);
+
+      document.getElementById("refreshBtn").addEventListener("click", loadDashboard);
+      document.getElementById("createBtn").addEventListener("click", createSession);
+      document.getElementById("copyPreBtn").addEventListener("click", () => copyText(document.getElementById("resultPreUrl").textContent));
+      document.getElementById("copyPostBtn").addEventListener("click", () => copyText(document.getElementById("resultPostUrl").textContent));
+      document.getElementById("openPreBtn").addEventListener("click", () => openText(document.getElementById("resultPreUrl").textContent));
+      document.getElementById("openPostBtn").addEventListener("click", () => openText(document.getElementById("resultPostUrl").textContent));
+      sessionSelect.addEventListener("change", () => loadDashboard(sessionSelect.value));
+
+      function loadDashboard(selectedSessionId) {
+        detailStatus.textContent = "読み込み中...";
+        google.script.run
+          .withSuccessHandler((data) => {
+            if (!data || !data.ok) {
+              detailStatus.className = "status error";
+              detailStatus.textContent = (data && data.error) || "データ取得に失敗しました。";
+              return;
+            }
+            currentData = data;
+            renderSessionOptions(data.sessions || [], data.selectedSessionId);
+            renderTrend(data.trend || []);
+            renderDetail(data.selected || null);
+            detailStatus.className = "status";
+            detailStatus.textContent = "";
+          })
+          .withFailureHandler((err) => {
+            detailStatus.className = "status error";
+            detailStatus.textContent = err && err.message ? err.message : String(err);
+          })
+          .getUniversityDashboardData(selectedSessionId || "");
+      }
+
+      function createSession() {
+        createStatus.className = "status";
+        createStatus.textContent = "作成中...";
+        const payload = {
+          title: document.getElementById("title").value.trim(),
+          eventDate: document.getElementById("eventDate").value,
+          note: document.getElementById("note").value.trim() || document.getElementById("shortNote").value.trim(),
+        };
+
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (!result || !result.ok) {
+              createStatus.className = "status error";
+              createStatus.textContent = (result && result.error) || "作成に失敗しました。";
+              return;
+            }
+            createStatus.className = "status ok";
+            createStatus.textContent = "作成しました。URLを発行しました。";
+            document.getElementById("resultBox").classList.remove("hidden");
+            document.getElementById("resultSession").textContent = result.session.session_id;
+            document.getElementById("resultPreUrl").textContent = result.session.pre_url;
+            document.getElementById("resultPostUrl").textContent = result.session.post_url;
+            loadDashboard(result.session.session_id);
+          })
+          .withFailureHandler((err) => {
+            createStatus.className = "status error";
+            createStatus.textContent = err && err.message ? err.message : String(err);
+          })
+          .createUniversitySession(payload);
+      }
+
+      function renderSessionOptions(sessions, selectedSessionId) {
+        sessionSelect.innerHTML = "";
+        if (!sessions.length) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "まだセッションがありません";
+          sessionSelect.appendChild(option);
+          return;
+        }
+        sessions.forEach((session) => {
+          const option = document.createElement("option");
+          option.value = session.session_id;
+          option.textContent = `${session.event_date || "日付なし"} / ${session.title || session.session_id}`;
+          if (session.session_id === selectedSessionId) option.selected = true;
+          sessionSelect.appendChild(option);
+        });
+      }
+
+      function renderTrend(rows) {
+        trendBody.innerHTML = "";
+        if (!rows.length) {
+          trendBody.innerHTML = '<tr><td colspan="5" class="tiny">データがありません。</td></tr>';
+          return;
+        }
+        rows.forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${escapeHtml(row.event_date || "")}</td>
+            <td>${escapeHtml(row.title || "")}</td>
+            <td>${formatNumber(row.pre_avg)}</td>
+            <td>${formatNumber(row.post_avg)}</td>
+            <td>${formatDelta(row.delta)}</td>
+          `;
+          trendBody.appendChild(tr);
+        });
+      }
+
+      function renderDetail(detail) {
+        detailMeta.innerHTML = "";
+        comparisonBody.innerHTML = "";
+
+        if (!detail) {
+          detailMeta.innerHTML = '<span class="pill">セッション未選択</span>';
+          comparisonBody.innerHTML = '<tr><td colspan="5" class="tiny">詳細データがありません。</td></tr>';
+          return;
+        }
+
+        detailMeta.appendChild(makePill(`pre: ${detail.counts.pre || 0}`));
+        detailMeta.appendChild(makePill(`post: ${detail.counts.post || 0}`, true));
+        detailMeta.appendChild(makePill(`pre平均: ${formatNumber(detail.averages.pre.total)}`));
+        detailMeta.appendChild(makePill(`post平均: ${formatNumber(detail.averages.post.total)}`, true));
+
+        if (!(detail.comparisons || []).length) {
+          comparisonBody.innerHTML = '<tr><td colspan="5" class="tiny">まだ回答がありません。</td></tr>';
+          return;
+        }
+
+        (detail.comparisons || []).forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${escapeHtml(row.name || row.student_id || row.respondent_key || "")}</td>
+            <td>${formatNumber(row.pre_total)}</td>
+            <td>${formatNumber(row.post_total)}</td>
+            <td>${formatDelta(row.delta_total)}</td>
+            <td>${renderLabeledScoreDiffs(row.delta_scores)}</td>
+          `;
+          comparisonBody.appendChild(tr);
+        });
+      }
+
+      function makePill(text, alt = false) {
+        const span = document.createElement("span");
+        span.className = alt ? "pill alt" : "pill";
+        span.textContent = text;
+        return span;
+      }
+
+      function formatNumber(value) {
+        return value === null || value === undefined || value === "" ? "-" : Number(value).toFixed(1);
+      }
+
+      function renderLabeledScoreDiffs(values) {
+        if (!Array.isArray(values) || !values.length) return "-";
+        return categoryLabels.map((label, index) => {
+          const value = values[index];
+          return `<div>${escapeHtml(label || `項目${index + 1}`)}: ${escapeHtml(formatDelta(value))}</div>`;
+        }).join("");
+      }
+
+      function formatDelta(value) {
+        if (value === null || value === undefined || value === "") return "-";
+        const n = Number(value);
+        return `${n >= 0 ? "+" : ""}${n.toFixed(1)}`;
+      }
+
+      function escapeHtml(text) {
+        return String(text)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      async function copyText(text) {
+        if (!text) return;
+        await navigator.clipboard.writeText(text);
+      }
+
+      function openText(text) {
+        if (!text) return;
+        window.open(text, "_blank", "noopener,noreferrer");
+      }
+
+      loadDashboard();
+    </script>
+  </body>
+</html>
